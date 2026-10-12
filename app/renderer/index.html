@@ -34,6 +34,7 @@
     </div>
     <div class="grp">
       <button id="undoBtn" title="Hoàn tác (Ctrl+Z)" disabled>↶ Hoàn tác</button>
+      <button id="redoBtn" title="Làm lại (Ctrl+Y)" disabled>↷ Làm lại</button>
       <button id="delBtn" title="Xóa đối tượng đang chọn (Delete)" disabled>🗑 Xóa</button>
     </div>
     <div class="status"><span class="dot ok" id="dot"></span><span id="status">Sẵn sàng</span></div>
@@ -146,6 +147,13 @@
       </div>
     </div>
     <div class="tab" data-tab="lib" hidden><div id="libGrid"></div></div>
+    <div class="row" style="padding:2px 14px 10px">
+      <span class="lbl">Đặt nhanh vào góc:</span>
+      <button id="sigAtBL" title="Đặt ở góc dưới bên trái trang">↙ Dưới trái</button>
+      <button id="sigAtBC" title="Đặt ở giữa mép dưới trang">↓ Giữa dưới</button>
+      <button id="sigAtBR" title="Đặt ở góc dưới bên phải trang">↘ Dưới phải</button>
+      <label class="chk" title="Đặt lên tất cả các trang chưa bị xoá"><input type="checkbox" id="sigAllPages"> Tất cả các trang</label>
+    </div>
     <div class="dlgFoot">
       <label class="chk" id="saveLibWrap"><input type="checkbox" id="saveLib" checked> Lưu vào thư viện để dùng lại</label>
       <label class="chk" id="keepPadWrap"><input type="checkbox" id="keepPad"> Giữ nét sau khi đặt</label>

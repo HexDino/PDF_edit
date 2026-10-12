@@ -14,7 +14,8 @@
   - **Bám dòng chữ**: khung tự nới cho phủ đúng dòng chữ (dùng lớp chữ của PDF); bấm gọn một chỗ là che trọn cả dòng. PDF scan không có lớp chữ thì bỏ qua.
   - **Nền che** chọn được: một màu, **chuyển sắc theo nền**, hoặc **sao chép dải nền phía trên**; thêm tuỳ chọn **mờ mép** cho khỏi lộ đường viền. Có nút tự lấy màu và ống hút.
   - Tùy chọn **xóa hẳn** khi lưu: chọn **định dạng ảnh (tự động / PNG / JPEG)**, **độ phân giải (150–600 dpi)** và chất lượng JPEG.
-- **Chữ ký**: vẽ trên pad, nhập ảnh (tách nền tự động theo Otsu, tự cắt sát, làm đậm/mảnh nét), thư viện chống trùng lặp. Thư viện lưu tại `%APPDATA%\TrinhSuaPDF\signatures` (Windows) hoặc tương đương trên Linux/macOS.
+- **Chữ ký**: vẽ trên pad, nhập ảnh (tách nền tự động theo Otsu, tự cắt sát, làm đậm/mảnh nét), thư viện chống trùng lặp. **Đặt nhanh vào góc trang** (dưới trái / giữa dưới / dưới phải) và tuỳ chọn **đặt lên tất cả các trang**. Thư viện lưu tại `%APPDATA%\TrinhSuaPDF\signatures` (Windows) hoặc tương đương trên Linux/macOS.
+- **Tiện ích soạn thảo**: hoàn tác / **làm lại** (Ctrl+Z · Ctrl+Y), **nhân bản đối tượng** (Ctrl+D hoặc nút ⧉ trên đối tượng), xoá đối tượng, phím tắt chọn công cụ (V/T/E/P/H).
 - Bút, bút dạ quang; xuất PDF qua pdf-lib + fontkit, nhúng phông theo **subset** để file nhẹ.
 - Đóng gói Windows x64: file **portable** và **NSIS installer** (electron-builder).
 
@@ -89,6 +90,12 @@ cd ../..
 
   ```bash
   npm run test:erase
+  ```
+
+- **Tiện ích soạn thảo** (làm lại, nhân bản đối tượng, đặt nhanh chữ ký vào góc trang):
+
+  ```bash
+  npm run test:editing
   ```
 
 - **Phông chữ**: kiểm tra độ phủ 146 ký tự tiếng Việt của mọi file trong

@@ -77,7 +77,7 @@ const cur = { font: 'PatrickHand', size: 18, color: '#1a2a7a', slant: 0, jitter:
   fill: '#ffffff', autoFill: true, penColor: '#1a2a7a', penW: 1.6, hlColor: '#ffe14d', hlW: 12, trueRemove: true,
   eraseShape: 'rect', snapLines: true, fillMode: 'solid', feather: false, brushW: 16,
   flattenFormat: 'auto', flattenQuality: 0.9, flattenDpi: 300 };
-const history = [];
+const history = [], future = [];   // future: ngăn xếp cho "làm lại" (Ctrl+Y)
 
 function toast(msg, ms = 2800) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
 function busy(on, txt) { $('busy').classList.toggle('show', on); if (txt) $('busyTxt').textContent = txt; }
@@ -401,18 +401,47 @@ const MASK_TYPES = ['rect', 'brush', 'lasso'];
 const isMask = o => MASK_TYPES.includes(o.type);
 const plain = o => { const r = { id: o.id, type: o.type, page: o.page }; for (const k of KEYS[o.type]) r[k] = o[k]; return r; };
 const snap = () => ({ objs: objects.map(plain), del: pages.map(p => p.deleted) });
-function pushHistory(s = snap()) { history.push(JSON.stringify(s)); if (history.length > 300) history.shift(); setDirty(true); updateButtons(); }
-function undo() {
-  if (!history.length) return;
-  const s = JSON.parse(history.pop());
-  objects.forEach(o => o.el.remove()); objects = []; selected = null;
+function pushHistory(s = snap()) {
+  history.push(JSON.stringify(s)); if (history.length > 300) history.shift();
+  future.length = 0;   // có thao tác mới thì nhánh "làm lại" cũ không còn giá trị
+  setDirty(true); updateButtons();
+}
+/** Dựng lại toàn bộ đối tượng + trạng thái trang từ một ảnh chụp. */
+function restoreState(s) {
+  objects.forEach(o => o.el?.remove()); objects = []; selected = null;
   s.objs.forEach(d => createObj(d));
   pages.forEach((p, i) => p.deleted = !!s.del[i]); refreshDeleted();
+}
+function undo() {
+  if (!history.length) return;
+  future.push(JSON.stringify(snap()));       // lưu trạng thái hiện tại để có thể làm lại
+  restoreState(JSON.parse(history.pop()));
   updateButtons(); syncControls(); toast('Đã hoàn tác');
 }
+function redo() {
+  if (!future.length) return;
+  history.push(JSON.stringify(snap()));
+  restoreState(JSON.parse(future.pop()));
+  updateButtons(); syncControls(); toast('Đã làm lại');
+}
 $('undoBtn').onclick = undo;
+$('redoBtn').onclick = redo;
+/** Nhân bản đối tượng đang chọn, lệch đi một chút để thấy ngay là đã tạo thêm. */
+function duplicateObj(o) {
+  if (!o) return null;
+  pushHistory();
+  const d = plain(o); delete d.id;
+  if (d.pts) d.pts = d.pts.map(([x, y]) => [x + 12, y + 12]);
+  else { d.x = (d.x || 0) + 12; d.y = (d.y || 0) + 12; }
+  const n = createObj(d);
+  setTool('select'); select(n);
+  toast('Đã nhân bản đối tượng');
+  return n;
+}
 function updateButtons() {
-  $('undoBtn').disabled = !history.length; $('delBtn').disabled = !selected;
+  $('undoBtn').disabled = !history.length;
+  $('redoBtn').disabled = !future.length;
+  $('delBtn').disabled = !selected;
   $('saveBtn').disabled = $('saveAsBtn').disabled = !pdfDoc;
 }
 
@@ -438,9 +467,10 @@ function onLayerDown(e, pg) {
     applyToSelected(o => isMask(o) && (o.color = c));
     setTool(prevTool === 'pick' ? 'erase' : prevTool); toast('Đã lấy màu ' + c);
   } else if (tool === 'place' && pendingPlace) {
-    const im = imgStore[pendingPlace.srcId], ar = im.h / im.w;
-    let w = pendingPlace.sig ? 150 : Math.min(260, pg.vp1.width * 0.5), h = w * ar;
-    if (pendingPlace.sig && h > 70) { h = 70; w = h / ar; }
+    const im = imgStore[pendingPlace.srcId];
+    let w, h;
+    if (pendingPlace.sig) ({ w, h } = sigSize(im.w, im.h));
+    else { w = Math.min(260, pg.vp1.width * 0.5); h = w * (im.h / im.w); }
     pushHistory();
     const o = createObj({ type: 'img', page: pg.idx, x: x - w / 2, y: y - h / 2, w, h, rot: 0, srcId: pendingPlace.srcId, sig: pendingPlace.sig });
     setTool('select'); select(o); toast('Kéo để di chuyển, góc dưới phải để đổi cỡ, nút tròn phía trên để xoay');
@@ -581,7 +611,7 @@ function createObj(d) {
   const o = { ...d, id: d.id || nextId++ };
   nextId = Math.max(nextId, o.id + 1);
   const el = document.createElement('div'); el.className = 'obj'; o.el = el;
-  const tools = '<div class="tools"><button class="mv" title="Kéo để di chuyển">✥</button>' + (o.type === 'text' ? '<button class="ed" title="Sửa chữ">✎</button>' : '') + '<button class="del" title="Xóa">✕</button></div>';
+  const tools = '<div class="tools"><button class="mv" title="Kéo để di chuyển">✥</button>' + (o.type === 'text' ? '<button class="ed" title="Sửa chữ">✎</button>' : '') + '<button class="dup" title="Nhân bản (Ctrl+D)">⧉</button><button class="del" title="Xóa">✕</button></div>';
   if (o.type === 'text') {
     o.slant ||= 0; o.jitter = !!o.jitter; o.seed ??= (Math.random() * 1e9) >>> 0;
     el.classList.add('tb');
@@ -608,6 +638,7 @@ function createObj(d) {
   }
   el.querySelector('.mv').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); select(o); startDrag(e, o); });
   el.querySelector('.del').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); deleteObj(o); });
+  el.querySelector('.dup').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); duplicateObj(o); });
   el.querySelector('.rs')?.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); select(o); startResize(e, o); });
   if (isMask(o) || o.type === 'img') el.addEventListener('pointerdown', e => {
     if (e.target.closest('.tools,.rs,.ro')) return;
@@ -777,13 +808,55 @@ let srcSeq = 1;
 function addSrc(dataUrl, w, h) { const id = 's' + (srcSeq++) + '-' + Date.now().toString(36); imgStore[id] = { dataUrl, w, h }; return id; }
 const fileToDataUrl = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
 const loadImage = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Ảnh không hợp lệ')); i.src = src; });
-async function startPlaceImage(dataUrl, sig) {
+/** Chuẩn hoá ảnh (đổi sang PNG nếu cần, thu nhỏ nếu quá lớn) rồi lưu vào imgStore. */
+async function prepareSrc(dataUrl) {
   if (!/^data:image\/(png|jpeg)/.test(dataUrl)) { const i0 = await loadImage(dataUrl), c = document.createElement('canvas'); c.width = i0.naturalWidth; c.height = i0.naturalHeight; c.getContext('2d').drawImage(i0, 0, 0); dataUrl = c.toDataURL('image/png'); }
   const im = await loadImage(dataUrl);
   // ảnh lớn: thu nhỏ để file PDF gọn (tối đa 2000 px)
   let url = dataUrl, w = im.naturalWidth, h = im.naturalHeight;
   if (Math.max(w, h) > 2000) { const k = 2000 / Math.max(w, h); const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); url = c.toDataURL(/png/.test(dataUrl.slice(0, 30)) ? 'image/png' : 'image/jpeg', 0.92); w = c.width; h = c.height; }
-  pendingPlace = { srcId: addSrc(url, w, h), sig };
+  return { srcId: addSrc(url, w, h), w, h };
+}
+/** Kích thước chữ ký khi đặt lên trang: rộng 150 điểm, không cao quá 70 điểm. */
+const SIG_W = 150, SIG_MAX_H = 70;
+function sigSize(w, h) {
+  const ar = h / w;
+  let sw = SIG_W, sh = sw * ar;
+  if (sh > SIG_MAX_H) { sh = SIG_MAX_H; sw = sh / ar; }
+  return { w: sw, h: sh };
+}
+/** Trang đang xem (theo vị trí cuộn) — dùng cho "đặt nhanh vào góc". */
+function currentPageIdx() {
+  if (!pages.length) return 0;
+  const vt = $('viewer').getBoundingClientRect().top + 80;
+  let best = pages[0];
+  for (const p of pages) if (p.el.getBoundingClientRect().top <= vt) best = p;
+  return best.idx;
+}
+/** Đặt chữ ký thẳng vào một góc trang, khỏi phải bấm chọn vị trí.
+ *  anchor: 'bl' | 'bc' | 'br'; allPages: đặt lên mọi trang chưa bị xoá. */
+async function placeSignatureAt(anchor, allPages, dataUrl) {
+  const { srcId, w, h } = await prepareSrc(dataUrl);
+  const { w: sw, h: sh } = sigSize(w, h);
+  const cur = pages[currentPageIdx()];
+  const targets = allPages ? pages.filter(p => !p.deleted)
+    : [cur && !cur.deleted ? cur : pages.find(p => !p.deleted)].filter(Boolean);
+  if (!targets.length) return toast('Không có trang nào để đặt chữ ký');
+  const m = 28;   // lề cách mép trang
+  pushHistory();
+  let last = null;
+  for (const pg of targets) {
+    const x = anchor === 'bl' ? m : anchor === 'br' ? Math.max(m, pg.vp1.width - sw - m) : Math.max(0, (pg.vp1.width - sw) / 2);
+    const y = Math.max(0, pg.vp1.height - sh - m);
+    last = createObj({ type: 'img', page: pg.idx, x, y, w: sw, h: sh, rot: 0, srcId, sig: true });
+  }
+  setTool('select'); select(last); updateButtons();
+  toast(targets.length > 1 ? `Đã đặt chữ ký vào ${targets.length} trang` : 'Đã đặt chữ ký vào góc trang', 3500);
+  return last;
+}
+async function startPlaceImage(dataUrl, sig) {
+  const { srcId } = await prepareSrc(dataUrl);
+  pendingPlace = { srcId, sig };
   setTool('place'); select(null);
   toast(sig ? 'Bấm vào vị trí trên trang để đặt chữ ký' : 'Bấm vào vị trí trên trang để đặt ảnh', 4000);
 }
@@ -1053,7 +1126,7 @@ async function saveSignatureToLib(url) {
   for (const s of list) if (await hashDataUrl(s.dataUrl) === h) { toast('Chữ ký này đã có trong thư viện, không lưu lại'); return; }
   await libApi.save(url);
 }
-async function useSignature() {
+async function useSignature(opts = {}) {
   let url = null;
   if (sigTab === 'draw') {
     url = padSignature();
@@ -1071,9 +1144,15 @@ async function useSignature() {
   // Đóng hộp thoại và đặt chữ ký NGAY; việc băm/lưu thư viện để chạy nền,
   // nếu await trước khi đóng thì hộp thoại còn che trang và cú bấm sẽ bị nuốt.
   closeModal($('sigModal'));
-  startPlaceImage(url, true).catch(e => { console.error(e); toast('Không đặt được chữ ký: ' + (e.message || e)); });
+  const done = opts.anchor
+    ? placeSignatureAt(opts.anchor, $('sigAllPages').checked, url)
+    : startPlaceImage(url, true);
+  done.catch(e => { console.error(e); toast('Không đặt được chữ ký: ' + (e.message || e)); });
   if (shouldSave) saveSignatureToLib(url).catch(e => console.warn(e));
 }
+$('sigAtBL').onclick = () => useSignature({ anchor: 'bl' });
+$('sigAtBC').onclick = () => useSignature({ anchor: 'bc' });
+$('sigAtBR').onclick = () => useSignature({ anchor: 'br' });
 
 /* ======================= Lưu PDF ======================= */
 const toRgb = h => { const [r, g, b] = hexRgb255(h); return rgb(r / 255, g / 255, b / 255); };
@@ -1380,7 +1459,9 @@ window.addEventListener('keydown', e => {
   if (c && (k === '=' || k === '+')) { e.preventDefault(); zoomIn(); return; }
   if (c && k === '-') { e.preventDefault(); zoomOut(); return; }
   const ae = document.activeElement?.tagName; if (ae === 'TEXTAREA' || ae === 'INPUT') return;
-  if (c && k === 'z') { e.preventDefault(); undo(); }
+  if (c && k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (c && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+  else if (c && k === 'd') { e.preventDefault(); if (selected) duplicateObj(selected); }
   else if ((k === 'delete' || k === 'backspace') && selected) { e.preventDefault(); deleteObj(selected); }
   else if (k === 'escape') { select(null); if (tool === 'place' || tool === 'pick') setTool('select'); }
   else if (!c && pdfDoc && { v: 1, t: 1, e: 1, p: 1, h: 1 }[k]) setTool({ v: 'select', t: 'text', e: 'erase', p: 'pen', h: 'hl' }[k]);
@@ -1403,5 +1484,7 @@ window.__app = { openBytes, createObj, save, doSave, buildPdf, setTool, chooseFo
   libApi, recolor, trimCanvas, hashDataUrl, autoBgTol, redrawPad, closeAllModals, padC, padSignature, drawStroke,
   FONTS, loadFont, fontBytes, charSetFor, pdfjs: pdfjsLib,
   pageLines, snapRectToLines, lineAt, maskBox, maskPatch, paintMask, renderMaskedPage, pickAutoFormat, syncFlatOpts,
+  redo, undo, restoreState, duplicateObj, placeSignatureAt, sigSize, currentPageIdx, prepareSrc, pushHistory,
+  get future() { return future; },
   get libSel() { return libSel; }, setLibSel: v => { libSel = v; },
   get sigSrcImg() { return sigSrcImg; }, setSigSrcImg: v => { sigSrcImg = v; } };

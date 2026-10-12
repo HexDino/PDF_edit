@@ -203,3 +203,27 @@ Thêm `fillMode` cho mỗi mask: `'color' | 'gradient' | 'clone'` (mặc định
 5. **Giai đoạn 4** — README, ảnh `docs/`, build (bản web đã bỏ).
 
 Sau mỗi giai đoạn: chạy test + demo thủ công để bạn nghiệm thu trước khi sang bước tiếp theo.
+
+---
+
+## 10. Bổ sung sau khi hoàn tất GĐ0–GĐ4 — gói tiện ích soạn thảo
+
+Làm theo đề xuất, chọn nhóm rủi ro thấp nhưng dùng hằng ngày:
+
+- [x] **Làm lại (Ctrl+Y / Ctrl+Shift+Z)** — thêm ngăn xếp `future`, tách `restoreState()` dùng chung cho hoàn tác/làm lại; thao tác mới sẽ xoá nhánh làm lại. Thêm nút "↷ Làm lại" trên thanh công cụ.
+- [x] **Nhân bản đối tượng (Ctrl+D)** — nút ⧉ trên mọi đối tượng; dịch 12 điểm, với vùng che/cọ thì dịch toàn bộ điểm.
+- [x] **Đặt nhanh chữ ký vào góc trang** — 3 nút (dưới trái / giữa dưới / dưới phải) + tuỳ chọn "Tất cả các trang"; tách `prepareSrc()` và `sigSize()` dùng chung với luồng đặt bằng tay.
+
+Test: `npm run test:editing` (12/12).
+
+### Đề xuất tiếp theo (chưa làm)
+| # | Việc | Vì sao |
+|---|---|---|
+| 1 | Lưu/đọc lại **phiên chỉnh sửa** (sidecar `.tsp.json`) | Hiện lưu là một chiều, mở lại không sửa được nữa |
+| 2 | **Xoay trang** + sắp xếp lại / thêm trang trắng / nhân bản trang | README đang ghi "không xoay trang"; scan lệch rất thường |
+| 3 | Hộp thoại **xem trước** trước khi lưu | Nhất là với "xoá hẳn": thấy trước kết quả và dung lượng |
+| 4 | **Bắt dòng kẻ chấm** để căn chữ khi điền biểu mẫu | Biểu mẫu Việt hay có "Họ và tên: ......" |
+| 5 | Thêm **Tinos · Arimo · Cousine** | Tương thích số đo Times / Arial / Courier để chữ điền khớp bản in |
+| 6 | Khi "xoá hẳn": **xoá metadata + tệp đính kèm**, kèm nút **"Kiểm tra lại"** | Công cụ che thông tin mà để lộ metadata là lỗ hổng thật |
+| 7 | **Nén ảnh / preset "vừa để gửi email"** | 1 trang A4 300 dpi đang cho ra ~800 KB–1 MB |
+| 8 | **Ảo hoá trang** (chỉ render trang đang xem) | File scan 100 trang hiện render hết một lượt |
