@@ -9,7 +9,7 @@
 import { _electron as electron } from 'playwright-core';
 import fs from 'fs';
 import path from 'path';
-import { APP_ROOT, OUT, electronBin, testFile, electronEnv } from './_paths.mjs';
+import { APP_ROOT, OUT, electronBin, testFile, electronEnv, closeApp } from './_paths.mjs';
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -169,7 +169,7 @@ const autoColor = await A(() => {
 });
 check('Tự động chọn JPEG cho ảnh nhiều màu', autoColor === 'jpeg', `chọn: ${autoColor}`);
 
-await app.close();
+await closeApp(app);
 
 const failed = results.filter(r => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} kiểm tra đạt.`);

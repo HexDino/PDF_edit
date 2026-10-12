@@ -1,7 +1,7 @@
 import { _electron as electron } from 'playwright-core';
 import fs from 'fs';
 import path from 'path';
-import { APP_ROOT, OUT, electronBin, testFile, electronEnv, sigLibDir } from './_paths.mjs';
+import { APP_ROOT, OUT, electronBin, testFile, electronEnv, sigLibDir, closeApp } from './_paths.mjs';
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -83,4 +83,4 @@ await w.hover('.th:nth-child(2)'); await w.click('.th:nth-child(2) .tdel');
 console.log('save text (NO true removal):', await saveVia(`${OUT}/text-che-phu.pdf`, false));
 console.log('save text (true removal):', await saveVia(`${OUT}/text-xoa-han.pdf`, true));
 console.log('LOGS:', logs.join('\n'));
-await app.close();
+await closeApp(app);

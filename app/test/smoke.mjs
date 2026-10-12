@@ -1,6 +1,6 @@
 import { _electron as electron } from 'playwright-core';
 import path from 'path';
-import { APP_ROOT, TEST_ROOT, electronBin, testFile, electronEnv } from './_paths.mjs';
+import { APP_ROOT, TEST_ROOT, electronBin, testFile, electronEnv, closeApp } from './_paths.mjs';
 
 const app = await electron.launch({
   executablePath: electronBin,
@@ -21,4 +21,4 @@ await w
 console.log('status:', await w.textContent('#status'), 'title:', await w.title());
 await w.screenshot({ path: path.join(TEST_ROOT, 'smoke.png') });
 console.log(logs.join('\n'));
-await app.close();
+await closeApp(app);

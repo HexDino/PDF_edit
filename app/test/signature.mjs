@@ -11,7 +11,7 @@
 import { _electron as electron } from 'playwright-core';
 import fs from 'fs';
 import path from 'path';
-import { APP_ROOT, OUT, electronBin, testFile, sigLibDir, electronEnv } from './_paths.mjs';
+import { APP_ROOT, OUT, electronBin, testFile, sigLibDir, electronEnv, closeApp } from './_paths.mjs';
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -159,7 +159,7 @@ try {
   if (fs.existsSync(dir)) console.log(`Thư viện trên đĩa: ${fs.readdirSync(dir).filter(f => f.endsWith('.png')).length} file · ${dir}`);
 } catch { /* không quan trọng */ }
 
-await app.close();
+await closeApp(app);
 
 const failed = results.filter(r => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} kiểm tra đạt.`);

@@ -1,6 +1,6 @@
 import { _electron as electron } from 'playwright-core';
 import fs from 'fs';
-import { APP_ROOT, OUT, electronBin, testFile, electronEnv } from './_paths.mjs';
+import { APP_ROOT, OUT, electronBin, testFile, electronEnv, closeApp } from './_paths.mjs';
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -89,4 +89,4 @@ for (const [n, tr] of [
   const bytes = await w.evaluate(async (tr) => Array.from((await window.__app.buildPdf(tr)).bytes), tr);
   fs.writeFileSync(`${OUT}/${n}.pdf`, Buffer.from(bytes));
 }
-await app.close();
+await closeApp(app);

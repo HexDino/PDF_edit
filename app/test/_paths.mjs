@@ -29,6 +29,19 @@ export function testFile(name) {
   return path.join(TEST_ROOT, name);
 }
 
+/**
+ * Đóng app an toàn khi chạy test.
+ * main.js có "hàng rào" hỏi xác nhận khi thoát lúc còn thay đổi chưa lưu — hộp thoại này
+ * sẽ CHẶN tiến trình test vô thời hạn. Vì vậy phải xoá cờ "chưa lưu" trước khi đóng.
+ */
+export async function closeApp(app) {
+  try {
+    const w = app.windows()[0];
+    if (w) await w.evaluate(() => { if (window.api) window.api.setDirty(false); });
+  } catch { /* cửa sổ có thể đã đóng */ }
+  await app.close().catch(() => {});
+}
+
 /** Thư mục thư viện chữ ký (khớp với app.getPath('userData')/signatures). */
 export function sigLibDir() {
   if (process.platform === 'win32') {
