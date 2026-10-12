@@ -43,7 +43,10 @@ const pts=[]; for(let i=0;i<=60;i++){const u=i/60; pts.push([pb.x+60+u*420, pb.y
 await w.mouse.move(...pts[0]); await w.mouse.down(); for(const p of pts) await w.mouse.move(p[0],p[1],{steps:2}); await w.mouse.up();
 await w.mouse.move(pb.x+80,pb.y+170); await w.mouse.down(); await w.mouse.move(pb.x+470,pb.y+160,{steps:25}); await w.mouse.up();
 await w.screenshot({path:`${OUT}/screenshot-signature-pad.png`});
-await w.click('#sigUse'); await clickAt(0, 380, 640);
+console.log('pad strokes:', await A(()=>window.__app.pad.strokes.length));
+// phải đợi hộp thoại đóng hẳn rồi mới bấm lên trang, nếu không cú bấm rơi vào lớp phủ modal
+await w.click('#sigUse'); await w.waitForFunction(()=>document.getElementById('sigModal').hidden, null, { timeout: 10000 }); await clickAt(0, 380, 640);
+console.log('sau khi đặt: objects =', JSON.stringify((await objs()).map(o=>o.type)));
 o = await objs(); const sig = o.find(x=>x.type==='img'); console.log('signature placed:', JSON.stringify({x:sig.x,y:sig.y,w:sig.w,h:sig.h}));
 await A(()=>{const a=window.__app; a.select(a.objects.find(o=>o.type==='img'));}); await w.fill('#rotIn','-8'); await w.dispatchEvent('#rotIn','input');
 console.log('signature rot after control:', await A(()=>window.__app.objects.find(o=>o.type==='img').rot));
@@ -54,7 +57,7 @@ await w.waitForFunction(()=>!!window.__app.sigOut);
 const alpha = await A(()=>{const c=window.__app.sigOut, x=c.getContext('2d'), d=x.getImageData(0,0,c.width,c.height).data; let t=0,o=0,s=0; for(let i=3;i<d.length;i+=4){if(d[i]===0)t++; else if(d[i]>200)o++; else s++;} return {w:c.width,h:c.height,transparent:+(t/(d.length/4)).toFixed(3),opaque:+(o/(d.length/4)).toFixed(3),semi:+(s/(d.length/4)).toFixed(3)};});
 console.log('bg removal result:', JSON.stringify(alpha));
 await w.screenshot({path:`${OUT}/screenshot-signature-import.png`});
-await w.click('#sigUse'); await clickAt(0, 150, 720);
+await w.click('#sigUse'); await w.waitForFunction(()=>document.getElementById('sigModal').hidden, null, { timeout: 10000 }); await clickAt(0, 150, 720);
 await A(()=>{const a=window.__app; a.select(null);});
 // pen + highlighter
 await w.click('[data-tool="hl"]'); await scrollTo(0,170); { const r=await L(0); await w.mouse.move(r.l+330*r.z,r.t+168*r.z); await w.mouse.down(); await w.mouse.move(r.l+590*r.z,r.t+168*r.z,{steps:10}); await w.mouse.up(); }

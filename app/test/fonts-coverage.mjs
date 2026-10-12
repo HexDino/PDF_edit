@@ -101,15 +101,23 @@ if (!jsonMode) {
 }
 
 const bad = rows.filter(r => r.missing > 0);
-if (WRITE_JSON) fs.writeFileSync(OUT_JSON, JSON.stringify({
+// Chỉ ghi lại khi phần dữ liệu phông thay đổi — tránh làm file bị "sửa" chỉ vì mốc thời gian,
+// khiến mỗi lần chạy test đều tạo diff rác.
+const payload = Object.fromEntries(rows.map(r => [r.file, { coverage: r.coverage, missing: r.missingChars, error: r.error || null }]));
+let unchanged = false;
+try {
+  const old = JSON.parse(fs.readFileSync(OUT_JSON, 'utf8'));
+  unchanged = JSON.stringify(old.fonts) === JSON.stringify(payload);
+} catch { /* chưa có file */ }
+if (WRITE_JSON && !unchanged) fs.writeFileSync(OUT_JSON, JSON.stringify({
   generatedAt: new Date().toISOString(),
   total: VIET.length,
   probe: VIET.join(''),
-  fonts: Object.fromEntries(rows.map(r => [r.file, { coverage: r.coverage, missing: r.missingChars, error: r.error || null }])),
+  fonts: payload,
 }, null, 2));
 
 if (!jsonMode) {
-  if (WRITE_JSON) console.log(`\nĐã ghi ${path.relative(APP_ROOT, OUT_JSON)}`);
+  if (WRITE_JSON) console.log(unchanged ? `\n${path.relative(APP_ROOT, OUT_JSON)} không đổi, giữ nguyên file cũ` : `\nĐã ghi ${path.relative(APP_ROOT, OUT_JSON)}`);
   if (bad.length) {
     console.log(`\n⚠ ${bad.length}/${rows.length} phông THIẾU ký tự tiếng Việt:`);
     for (const b of bad) console.log(`   · ${b.file} — thiếu ${b.missing}/${VIET.length}`);

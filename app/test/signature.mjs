@@ -33,6 +33,15 @@ await w.waitForTimeout(300);
 const A = (fn, arg) => w.evaluate(fn, arg);
 const objs = () => A(() => window.__app.objects.map(o => ({ type: o.type, sig: !!o.sig, w: o.w, h: o.h, x: o.x, y: o.y })));
 const libCount = () => A(async () => (await window.__app.libApi.list()).length);
+/** Việc lưu thư viện chạy nền (không chặn đóng hộp thoại) nên phải chờ số lượng đổi. */
+async function waitLib(prev, ms = 5000) {
+  const t0 = Date.now();
+  for (;;) {
+    const n = await libCount();
+    if (n !== prev || Date.now() - t0 > ms) return n;
+    await w.waitForTimeout(120);
+  }
+}
 const keepPad = v => A(on => { document.getElementById('keepPad').checked = on; }, v);
 
 let pageRect = null;
@@ -70,7 +79,7 @@ check('Đặt được chữ ký lên trang', placed.length === 1, JSON.stringif
 const strokesAfter = await A(() => window.__app.pad.strokes.length);
 check('S1: pad được xoá sau khi đặt', strokesAfter === 0, `còn ${strokesAfter} nét`);
 
-const libAfter1 = await libCount();
+const libAfter1 = await waitLib(libBefore);
 check('Thư viện tăng đúng 1 bản sau lần đặt đầu', libAfter1 - libBefore === 1, `${libBefore} → ${libAfter1}`);
 
 /* ---------- S4: mở lại hộp thoại phải reset trạng thái ---------- */
@@ -96,7 +105,7 @@ await drawOnPad();
 const sigA = await A(() => window.__app.padSignature());
 await w.click('#sigUse'); await w.waitForTimeout(200);
 await placeOnPage();
-const libAfter2 = await libCount();
+const libAfter2 = await waitLib(libAfter1);
 check('S3: đặt lần đầu với nét mới -> +1', libAfter2 - libAfter1 === 1, `${libAfter1} → ${libAfter2}`);
 
 // Mở lại hộp thoại (không vẽ thêm): ảnh chữ ký xuất ra phải y hệt lần trước
@@ -107,6 +116,7 @@ check('Nét vẽ xuất ra nhất quán sau khi mở lại hộp thoại', !!sig
 
 await w.click('#sigUse'); await w.waitForTimeout(200);
 await placeOnPage();
+await w.waitForTimeout(2000);   // đợi việc lưu nền kết luận là trùng hay không
 const libAfter3 = await libCount();
 check('S3: chữ ký trùng không thêm vào thư viện', libAfter3 === libAfter2, `${libAfter2} → ${libAfter3}`);
 await keepPad(false);

@@ -1046,6 +1046,13 @@ function padSignature() {
   pad.strokes.forEach(s => drawStroke(x, s, 0, S));
   return c.toDataURL('image/png');
 }
+/** Lưu chữ ký vào thư viện, bỏ qua nếu đã có bản y hệt.
+ *  Chạy NỀN: không được chặn việc đóng hộp thoại và đặt chữ ký lên trang. */
+async function saveSignatureToLib(url) {
+  const h = await hashDataUrl(url), list = await libApi.list();
+  for (const s of list) if (await hashDataUrl(s.dataUrl) === h) { toast('Chữ ký này đã có trong thư viện, không lưu lại'); return; }
+  await libApi.save(url);
+}
 async function useSignature() {
   let url = null;
   if (sigTab === 'draw') {
@@ -1057,22 +1064,15 @@ async function useSignature() {
   } else { if (!libSel) return toast('Hãy chọn một chữ ký trong thư viện'); url = libSel.dataUrl; }
   if (!url) return;
 
-  if (sigTab !== 'lib' && $('saveLib').checked) {
-    try {
-      // Chống trùng: chỉ lưu khi chưa có chữ ký y hệt trong thư viện
-      const h = await hashDataUrl(url), list = await libApi.list();
-      let dup = false;
-      for (const s of list) if (await hashDataUrl(s.dataUrl) === h) { dup = true; break; }
-      if (dup) toast('Chữ ký này đã có trong thư viện, không lưu lại');
-      else await libApi.save(url);
-    } catch (e) { console.warn(e); }
-  }
-
+  const shouldSave = sigTab !== 'lib' && $('saveLib').checked;
   // Không giữ nét cũ trên pad -> lần mở sau bắt đầu với ô ký trắng
   if (sigTab === 'draw' && !$('keepPad').checked) { pad.strokes = []; redrawPad(); }
 
+  // Đóng hộp thoại và đặt chữ ký NGAY; việc băm/lưu thư viện để chạy nền,
+  // nếu await trước khi đóng thì hộp thoại còn che trang và cú bấm sẽ bị nuốt.
   closeModal($('sigModal'));
-  await startPlaceImage(url, true);
+  startPlaceImage(url, true).catch(e => { console.error(e); toast('Không đặt được chữ ký: ' + (e.message || e)); });
+  if (shouldSave) saveSignatureToLib(url).catch(e => console.warn(e));
 }
 
 /* ======================= Lưu PDF ======================= */
