@@ -41,7 +41,15 @@
   <div class="ctx">
     <!-- Chữ -->
     <div class="sec" data-ctx="text">
-      <div class="fp"><button id="fontBtn" title="Phông chữ viết tay"><span id="fontBtnTxt">Patrick Hand</span><span class="cv">▼</span></button><div id="fontPanel"></div></div>
+      <div class="fp"><button id="fontBtn" title="Phông chữ viết tay"><span id="fontBtnTxt">Patrick Hand</span><span class="cv">▼</span></button>
+        <div id="fontPanel">
+          <div class="fpBar">
+            <input type="search" id="fontSearch" placeholder="Tìm phông…" autocomplete="off">
+            <input type="text" id="fontPreviewText" placeholder="Chữ xem trước" autocomplete="off">
+          </div>
+          <div id="fontList"></div>
+        </div>
+      </div>
       <span class="lbl">Cỡ</span><input type="number" id="sizeIn" min="4" max="200" step="1" value="18">
       <span class="lbl">Nghiêng thêm</span><input type="number" id="slantIn" min="0" max="30" step="1" value="0">
       <label class="chk" title="Mỗi dòng lệch nhẹ như viết vội"><input type="checkbox" id="jitterIn"> Rung tay</label>
@@ -61,6 +69,21 @@
     <div class="sec" data-ctx="img">
       <span class="lbl">Xoay</span><input type="number" id="rotIn" min="-180" max="180" step="1" value="0"><span class="lbl">°</span>
       <span class="lbl">Ảnh màu ký: </span><button id="recolorBtn" title="Đổi màu nét chữ ký theo màu đang chọn">Đổi màu nét</button>
+    </div>
+    <div class="sec" data-ctx="erase rect">
+      <span class="lbl">Kiểu xoá</span>
+      <button data-es="rect" class="on" title="Kéo khung chữ nhật">▭ Khung</button>
+      <button data-es="brush" title="Cọ xoá tự do: kéo nét để xoá theo nét">🖌 Cọ xoá</button>
+      <button data-es="lasso" title="Khoanh vùng tự do rồi xoá cả vùng">✎ Khoanh vùng</button>
+      <label class="chk" title="Tự nới khung che cho vừa đúng dòng chữ bên dưới"><input type="checkbox" id="snapLines" checked> Bám dòng chữ</label>
+      <span class="lbl">Cỡ cọ</span><input type="number" id="brushW" min="4" max="120" step="2" value="16" title="Bề rộng nét cọ xoá">
+      <span class="lbl">Nền che</span>
+      <select id="fillModeIn" title="Cách tô vùng che">
+        <option value="solid">Một màu</option>
+        <option value="gradient">Chuyển sắc theo nền</option>
+        <option value="clone">Sao chép vùng trên</option>
+      </select>
+      <label class="chk" title="Làm mờ mép vùng che cho khỏi lộ đường viền"><input type="checkbox" id="featherIn"> Mờ mép</label>
     </div>
     <div class="sec" data-ctx="erase rect">
       <span class="lbl">Màu nền che</span>
@@ -112,14 +135,20 @@
       <div class="row">
         <label class="chk"><input type="checkbox" id="bgRemove" checked> Tách nền (nền giấy → trong suốt)</label>
         <span class="lbl">Độ nhạy</span><input type="range" id="bgTol" min="5" max="120" value="45">
+        <button id="bgAutoBtn" title="Tự tính độ nhạy theo từng ảnh (Otsu)">🎯 Tự động</button>
         <label class="chk"><input type="checkbox" id="sigRecolor"> Tô lại màu mực</label>
         <input type="color" id="sigRecolorC" value="#1a2a7a">
         <label class="chk"><input type="checkbox" id="sigCrop" checked> Tự cắt sát</label>
+      </div>
+      <div class="row">
+        <span class="lbl">Làm đậm / mảnh nét</span><input type="range" id="sigWeight" min="30" max="250" value="100" title="Tăng để nét đậm rõ hơn, giảm để nét mảnh hơn">
+        <span class="lbl">(100 = giữ nguyên)</span>
       </div>
     </div>
     <div class="tab" data-tab="lib" hidden><div id="libGrid"></div></div>
     <div class="dlgFoot">
       <label class="chk" id="saveLibWrap"><input type="checkbox" id="saveLib" checked> Lưu vào thư viện để dùng lại</label>
+      <label class="chk" id="keepPadWrap"><input type="checkbox" id="keepPad"> Giữ nét sau khi đặt</label>
       <span style="flex:1"></span>
       <button data-close>Hủy</button><button class="primary" id="sigUse">Đặt lên trang</button>
     </div>
@@ -133,7 +162,32 @@
     <div class="pad16">
       <p id="saveInfo"></p>
       <label class="chk big"><input type="checkbox" id="trueRemove" checked> <b>Xóa hẳn nội dung bị che</b> (khuyên dùng)</label>
-      <p class="note">Các trang có vùng tẩy xóa sẽ được chuyển thành ảnh 300 dpi trước khi vẽ nội dung mới, nên chữ/ảnh cũ dưới vùng che bị xóa thật, không thể sao chép hay khôi phục. Nhược điểm: chữ trên các trang đó không còn chọn/tìm kiếm được.</p>
+      <div class="qOpts" id="flatOpts">
+        <div class="row">
+          <span class="lbl">Định dạng ảnh</span>
+          <select id="flatFormat">
+            <option value="auto">Tự động (khuyên dùng)</option>
+            <option value="png">PNG — không mất nét</option>
+            <option value="jpeg">JPEG — nhẹ hơn</option>
+          </select>
+          <span class="lbl">Độ phân giải</span>
+          <select id="flatDpi">
+            <option value="150">150 dpi</option>
+            <option value="200">200 dpi</option>
+            <option value="300" selected>300 dpi</option>
+            <option value="450">450 dpi</option>
+            <option value="600">600 dpi</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="lbl">Chất lượng JPEG</span>
+          <input type="range" id="flatQuality" min="60" max="100" value="90">
+          <span class="lbl" id="flatQualityLbl">90</span>
+          <span class="lbl" id="flatHint"></span>
+        </div>
+      </div>
+      <p class="note">Các trang có vùng tẩy xóa sẽ được chuyển thành ảnh trước khi vẽ nội dung mới, nên chữ/ảnh cũ dưới vùng che bị xóa thật, không thể sao chép hay khôi phục. Nhược điểm: chữ trên các trang đó không còn chọn/tìm kiếm được.</p>
+      <p class="note">Chế độ <b>Tự động</b> chọn PNG cho trang chữ (nét sắc, không mất dữ liệu) và JPEG cho trang scan/ảnh. Độ phân giải cao hơn thì file nặng hơn.</p>
       <p class="note warnTxt">Nếu bỏ chọn: vùng che chỉ phủ lên trên — người khác vẫn có thể sao chép hoặc gỡ lớp che để xem nội dung cũ.</p>
     </div>
     <div class="dlgFoot"><span style="flex:1"></span><button data-close>Hủy</button><button class="primary" id="saveGo">Lưu</button></div>

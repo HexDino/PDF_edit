@@ -24,6 +24,12 @@ Thumbs.db
 .env
 .env.*
 
+# Trạng thái cục bộ của trợ lý (không phải mã nguồn dự án)
+.workbuddy-ai/
+
+# Thư mục tải phông ứng viên để kiểm tra trước khi thêm
+app/test/fonts-candidates*/
+
 # Playwright (if added later)
 playwright-report/
 test-results/

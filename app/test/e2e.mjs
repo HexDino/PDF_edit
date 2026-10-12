@@ -1,16 +1,17 @@
 import { _electron as electron } from 'playwright-core';
 import fs from 'fs';
-import { APP_ROOT, OUT, electronBin, testFile } from './_paths.mjs';
+import path from 'path';
+import { APP_ROOT, OUT, electronBin, testFile, electronEnv, sigLibDir } from './_paths.mjs';
 
 fs.mkdirSync(OUT, { recursive: true });
 
-const app = await electron.launch({ executablePath: electronBin, args: [APP_ROOT, '--no-sandbox'] });
+const app = await electron.launch({ executablePath: electronBin, args: [APP_ROOT, '--no-sandbox'], env: electronEnv });
 const w = await app.firstWindow(); await w.setViewportSize({width:1500,height:940}).catch(()=>{});
 const logs=[]; w.on('console', m => { if (m.type()==='error'||m.type()==='warning') logs.push(m.type()+': '+m.text()); }); w.on('pageerror', e => logs.push('PAGEERROR '+e.message));
 await app.evaluate(({BrowserWindow})=>{ const b=BrowserWindow.getAllWindows()[0]; b.unmaximize(); b.setSize(1500,960); });
 let savePath=null;
 const setSave = p => app.evaluate(({dialog}, p)=>{ dialog.showSaveDialog = async()=>({canceled:false, filePath:p}); }, p);
-await w.waitForFunction(()=>window.__app && document.getElementById('status').textContent.includes('17 phông'));
+await w.waitForFunction(() => window.__app && document.querySelectorAll('#fontList .fi').length === window.__app.FONTS.length);
 const A = (fn, arg) => w.evaluate(fn, arg);
 async function openPdf(file){ await A(async(b64)=>{const s=atob(b64.d);const u=new Uint8Array(s.length);for(let i=0;i<u.length;i++)u[i]=s.charCodeAt(i);await window.__app.openBytes(u,b64.n,b64.path);},{d:fs.readFileSync(file).toString('base64'),n:file.split('/').pop(),path:file});
   await w.waitForFunction(()=>window.__app.pages.every(p=>p.rendered>0)); }
@@ -63,10 +64,11 @@ await scrollTo(0, 420); await w.waitForTimeout(300);
 await w.screenshot({path:`${OUT}/screenshot-signature-placed.png`});
 console.log('objects on scan:', JSON.stringify((await objs()).map(o=>o.type)));
 console.log('save scan:', await saveVia(`${OUT}/scan-da-chinh-sua.pdf`, true));
-const libFiles = fs.readdirSync(process.env.HOME+'/.config/TrinhSuaPDF/signatures'); console.log('signature library files:', libFiles.length);
+try { console.log('signature library files:', fs.readdirSync(sigLibDir()).length); }
+catch { console.log('signature library files: (thư mục chưa tồn tại)'); }
 
 /* ---------- 2. PDF chữ thường: tẩy xóa số tài khoản, xóa hẳn ---------- */
-await setSave('/dev/null'); await app.evaluate(({dialog})=>{}); await A(()=>{window.confirm=()=>true;});
+await setSave(path.join(OUT, '_tmp-save.pdf')); await app.evaluate(({dialog})=>{}); await A(()=>{window.confirm=()=>true;});
 await openPdf(testFile('text-doc.pdf'));
 await w.click('[data-tool="erase"]');
 await dragRect(0, 196, 176, 290, 198);

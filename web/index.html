@@ -182,8 +182,8 @@ const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/';
 /* ---------- Phông chữ viết tay (đã kiểm tra có đủ glyph tiếng Việt) ---------- */
 const GF = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/';
 const RAW = 'https://raw.githubusercontent.com/google/fonts/main/ofl/';
-const G_NEAT = 'Chữ viết tay gọn', G_SIGN = 'Kiểu chữ ký', G_DOC = 'Kiểu bác sĩ (viết nhanh)';
-// Tất cả đã kiểm tra bằng fontTools: đủ 134 chữ cái tiếng Việt (hoa + thường), 0 thiếu
+const G_NEAT = 'Chữ viết tay gọn', G_SIGN = 'Kiểu chữ ký', G_DOC = 'Kiểu bác sĩ (viết nhanh)', G_PRINT = 'In / văn bản';
+// Tất cả đã kiểm tra đủ 146 chữ cái tiếng Việt (hoa + thường) — xem app/test/fonts-coverage.mjs
 const FONTS = [
   { key:'PatrickHand',   gf:'Patrick Hand',    name:'Patrick Hand',    group:G_NEAT, path:'patrickhand/PatrickHand-Regular.ttf' },
   { key:'Mali',          gf:'Mali',            name:'Mali',            group:G_NEAT, path:'mali/Mali-Regular.ttf' },
@@ -191,18 +191,32 @@ const FONTS = [
   { key:'PlaywriteVN',   gf:'Playwrite VN',    name:'Playwrite VN (chữ học trò)', group:G_NEAT, path:'playwritevn/PlaywriteVN%5Bwght%5D.ttf' },
   { key:'BadScript',     gf:'Bad Script',      name:'Bad Script',      group:G_NEAT, path:'badscript/BadScript-Regular.ttf' },
   { key:'GrapeNuts',     gf:'Grape Nuts',      name:'Grape Nuts',      group:G_NEAT, path:'grapenuts/GrapeNuts-Regular.ttf' },
+  { key:'Itim',          gf:'Itim',            name:'Itim',            group:G_NEAT, path:'itim/Itim-Regular.ttf' },
+  { key:'Pangolin',      gf:'Pangolin',        name:'Pangolin',        group:G_NEAT, path:'pangolin/Pangolin-Regular.ttf' },
   { key:'DancingScript', gf:'Dancing Script',  name:'Dancing Script',  group:G_SIGN, path:'dancingscript/DancingScript%5Bwght%5D.ttf' },
   { key:'Charm',         gf:'Charm',           name:'Charm',           group:G_SIGN, path:'charm/Charm-Regular.ttf' },
   { key:'GreatVibes',    gf:'Great Vibes',     name:'Great Vibes',     group:G_SIGN, path:'greatvibes/GreatVibes-Regular.ttf' },
   { key:'AlexBrush',     gf:'Alex Brush',      name:'Alex Brush',      group:G_SIGN, path:'alexbrush/AlexBrush-Regular.ttf' },
   { key:'MeaCulpa',      gf:'Mea Culpa',       name:'Mea Culpa',       group:G_SIGN, path:'meaculpa/MeaCulpa-Regular.ttf' },
+  { key:'Allura',        gf:'Allura',          name:'Allura',          group:G_SIGN, path:'allura/Allura-Regular.ttf' },
+  { key:'Italianno',     gf:'Italianno',       name:'Italianno',       group:G_SIGN, path:'italianno/Italianno-Regular.ttf' },
+  { key:'PinyonScript',  gf:'Pinyon Script',   name:'Pinyon Script',   group:G_SIGN, path:'pinyonscript/PinyonScript-Regular.ttf' },
+  { key:'MeowScript',    gf:'Meow Script',     name:'Meow Script',     group:G_SIGN, path:'meowscript/MeowScript-Regular.ttf' },
+  { key:'ComforterBrush',gf:'Comforter Brush', name:'Comforter Brush', group:G_SIGN, path:'comforterbrush/ComforterBrush-Regular.ttf' },
   { key:'Babylonica',    gf:'Babylonica',      name:'Babylonica',      group:G_DOC,  path:'babylonica/Babylonica-Regular.ttf' },
   { key:'Ole',           gf:'Ole',             name:'Ole',             group:G_DOC,  path:'ole/Ole-Regular.ttf' },
   { key:'QwitcherGrypen',gf:'Qwitcher Grypen', name:'Qwitcher Grypen', group:G_DOC,  path:'qwitchergrypen/QwitcherGrypen-Regular.ttf' },
   { key:'Shalimar',      gf:'Shalimar',        name:'Shalimar',        group:G_DOC,  path:'shalimar/Shalimar-Regular.ttf' },
   { key:'Waterfall',     gf:'Waterfall',       name:'Waterfall',       group:G_DOC,  path:'waterfall/Waterfall-Regular.ttf' },
   { key:'Updock',        gf:'Updock',          name:'Updock',          group:G_DOC,  path:'updock/Updock-Regular.ttf' },
+  { key:'BeVietnamPro',  gf:'Be Vietnam Pro',  name:'Be Vietnam Pro (chữ in)',    group:G_PRINT, path:'bevietnampro/BeVietnamPro-Regular.ttf' },
+  { key:'Lora',          gf:'Lora',            name:'Lora (in có chân)',          group:G_PRINT, path:'lora/Lora%5Bwght%5D.ttf' },
+  { key:'PlayfairDisplay',gf:'Playfair Display',name:'Playfair Display (tiêu đề)',group:G_PRINT, path:'playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf' },
+  { key:'IBMPlexMono',   gf:'IBM Plex Mono',   name:'IBM Plex Mono (đánh máy)',   group:G_PRINT, path:'ibmplexmono/IBMPlexMono-Regular.ttf' },
+  { key:'JetBrainsMono', gf:'JetBrains Mono',  name:'JetBrains Mono (đánh máy)',  group:G_PRINT, path:'jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf' },
 ];
+const GROUP_ORDER = [G_NEAT, G_SIGN, G_DOC, G_PRINT];
+const allGroups = () => [...GROUP_ORDER, ...new Set(FONTS.map(f => f.group))].filter((g, i, a) => g && a.indexOf(g) === i);
 const fontByKey = k => FONTS.find(f => f.key === k);
 const SAMPLE = 'Bệnh nhân uống thuốc ngày 2 lần';
 const LH = 1.25;                  // line-height (phải trùng với CSS)
@@ -222,7 +236,7 @@ const $ = id => document.getElementById(id);
 const prevFam = f => `'${f.gf}', '${'HW-' + f.key}', cursive`;
 function buildPicker() {
   const panel = $('fontPanel'); panel.innerHTML = '';
-  for (const g of [G_NEAT, G_SIGN, G_DOC]) {
+  for (const g of allGroups()) {
     const h = document.createElement('div'); h.className = 'fg'; h.textContent = g; panel.appendChild(h);
     for (const f of FONTS.filter(f => f.group === g)) {
       const it = document.createElement('button'); it.className = 'fi'; it.dataset.key = f.key;
@@ -244,7 +258,7 @@ async function chooseFont(key) {
   cur.font = key; applyFontPreview();
   const f = fontByKey(key);
   if (!fontBytes[key]) setFontStatus('', `Đang tải phông ${f.name}…`);
-  try { await loadFont(f); setFontStatus('ok', `Sẵn sàng · ${FONTS.length} phông viết tay`); }
+  try { await loadFont(f); setFontStatus('ok', `Sẵn sàng · ${FONTS.length} phông`); }
   catch (e) { setFontStatus('err', `Không tải được ${f.name} (cần Internet)`); toast('Không tải được phông ' + f.name); return; }
   applyToSelected(b => b.font = key);
 }
@@ -280,7 +294,7 @@ function measureBaseline(key) {
   const r = d.lastChild.offsetTop / S; d.remove(); return r;
 }
 (async () => {   // chỉ tải sẵn phông mặc định
-  try { await loadFont(FONTS[0]); setFontStatus('ok', `Sẵn sàng · ${FONTS.length} phông viết tay`); }
+  try { await loadFont(FONTS[0]); setFontStatus('ok', `Sẵn sàng · ${FONTS.length} phông`); }
   catch (e) { setFontStatus('err', 'Không tải được phông (cần Internet)'); }
   applyFontPreview();
 })();
@@ -590,16 +604,22 @@ async function savePdf() {
     const doc = await PDFDocument.load(origBytes, { ignoreEncryption: true, updateMetadata: false });
     doc.registerFontkit(window.fontkit);
     const embedded = {};
+    const FEATS = { liga: false, clig: false, calt: false, dlig: false, frac: false, numr: false, dnom: false, kern: false };
     for (const key of new Set(items.map(b => b.font))) {
       const buf = await loadFont(fontByKey(key));
-      // Tắt ligature/phân số để chữ trong PDF trùng khớp với chữ trên màn hình
-      embedded[key] = await doc.embedFont(new Uint8Array(buf), { subset: false,
-        features: { liga: false, clig: false, calt: false, dlig: false, frac: false, numr: false, dnom: false, kern: false } });
+      // Nhúng theo subset cho file nhẹ; nếu phông không hỗ trợ thì nhúng nguyên bản
+      try { embedded[key] = await doc.embedFont(new Uint8Array(buf), { subset: true, features: FEATS }); }
+      catch { embedded[key] = await doc.embedFont(new Uint8Array(buf), { subset: false, features: FEATS }); }
     }
-    // Cảnh báo ký tự mà phông không có (trên màn hình trình duyệt tự thay phông khác, nhưng PDF sẽ không hiện)
+    // Cảnh báo ký tự mà phông không có (trên màn hình trình duyệt tự thay phông khác, nhưng PDF sẽ không hiện).
+    // Lấy tập ký tự từ FILE phông gốc: khi bật subset, getCharacterSet() của phông đã nhúng chỉ lớn dần theo nội dung đã vẽ.
+    const charSets = {};
+    for (const key in embedded) {
+      try { charSets[key] = new Set(window.fontkit.create(fontBytes[key]).characterSet); } catch { charSets[key] = null; }
+    }
     const missing = {};
     for (const key in embedded) {
-      const cs = new Set(embedded[key].getCharacterSet());
+      const cs = charSets[key]; if (!cs) continue;
       for (const b of items.filter(b => b.font === key))
         for (const ch of b.text.normalize('NFC')) if (!/\s/.test(ch) && !cs.has(ch.codePointAt(0))) (missing[key] ??= new Set()).add(ch);
     }

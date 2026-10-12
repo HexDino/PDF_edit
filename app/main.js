@@ -22,7 +22,10 @@ function pdfFromArgv(argv) {
 }
 function sigDir() { const d = path.join(app.getPath('userData'), 'signatures'); fs.mkdirSync(d, { recursive: true }); return d; }
 
-if (!app.requestSingleInstanceLock()) { app.quit(); }
+// Khi chạy kiểm thử tự động (TSP_NO_SINGLE_INSTANCE=1), bỏ khoá một-instance để
+// test vẫn khởi động được dù người dùng đang mở sẵn ứng dụng.
+const SKIP_LOCK = process.env.TSP_NO_SINGLE_INSTANCE === '1';
+if (!SKIP_LOCK && !app.requestSingleInstanceLock()) { app.quit(); }
 else {
   app.on('second-instance', (_e, argv) => {
     const f = pdfFromArgv(argv);

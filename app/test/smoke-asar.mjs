@@ -1,11 +1,12 @@
 import { _electron as electron } from 'playwright-core';
 import path from 'path';
-import { APP_ROOT, TEST_ROOT, electronBin, testFile } from './_paths.mjs';
+import { APP_ROOT, TEST_ROOT, electronBin, testFile, electronEnv } from './_paths.mjs';
 
 const asar = path.join(APP_ROOT, 'dist/win-unpacked/resources/app.asar');
 const app = await electron.launch({
   executablePath: electronBin,
   args: [asar, '--no-sandbox', testFile('scan-test.pdf')],
+  env: electronEnv,
 });
 const w = await app.firstWindow();
 const logs = [];

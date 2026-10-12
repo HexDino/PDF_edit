@@ -6,8 +6,10 @@ const API = window.api || null;
 const $ = id => document.getElementById(id);
 const LH = 1.25;
 
-/* ======================= Phông chữ (đều có sẵn trong ứng dụng) ======================= */
-const G_NEAT = 'Chữ viết tay gọn', G_SIGN = 'Kiểu chữ ký', G_DOC = 'Kiểu bác sĩ (viết nhanh)';
+/* ======================= Phông chữ (đều có sẵn trong ứng dụng) =======================
+   Mọi phông ở đây đã được kiểm tra đủ 146 ký tự tiếng Việt bằng test/fonts-coverage.mjs
+   (tag "vietnamese" của Google Fonts KHÔNG bảo đảm đủ dấu chồng). */
+const G_NEAT = 'Chữ viết tay gọn', G_SIGN = 'Kiểu chữ ký', G_DOC = 'Kiểu bác sĩ (viết nhanh)', G_PRINT = 'In / văn bản';
 const FONTS = [
   ['PatrickHand', 'Patrick Hand', G_NEAT, 'PatrickHand-Regular.ttf'],
   ['Mali', 'Mali', G_NEAT, 'Mali-Regular.ttf'],
@@ -15,18 +17,33 @@ const FONTS = [
   ['PlaywriteVN', 'Playwrite VN (chữ học trò)', G_NEAT, 'PlaywriteVN.ttf'],
   ['BadScript', 'Bad Script', G_NEAT, 'BadScript-Regular.ttf'],
   ['GrapeNuts', 'Grape Nuts', G_NEAT, 'GrapeNuts-Regular.ttf'],
+  ['Itim', 'Itim', G_NEAT, 'Itim-Regular.ttf'],
+  ['Pangolin', 'Pangolin', G_NEAT, 'Pangolin-Regular.ttf'],
   ['DancingScript', 'Dancing Script', G_SIGN, 'DancingScript.ttf'],
   ['Charm', 'Charm', G_SIGN, 'Charm-Regular.ttf'],
   ['GreatVibes', 'Great Vibes', G_SIGN, 'GreatVibes-Regular.ttf'],
   ['AlexBrush', 'Alex Brush', G_SIGN, 'AlexBrush-Regular.ttf'],
   ['MeaCulpa', 'Mea Culpa', G_SIGN, 'MeaCulpa-Regular.ttf'],
+  ['Allura', 'Allura', G_SIGN, 'Allura-Regular.ttf'],
+  ['Italianno', 'Italianno', G_SIGN, 'Italianno-Regular.ttf'],
+  ['PinyonScript', 'Pinyon Script', G_SIGN, 'PinyonScript-Regular.ttf'],
+  ['MeowScript', 'Meow Script', G_SIGN, 'MeowScript-Regular.ttf'],
+  ['ComforterBrush', 'Comforter Brush', G_SIGN, 'ComforterBrush-Regular.ttf'],
   ['Babylonica', 'Babylonica', G_DOC, 'Babylonica-Regular.ttf'],
   ['Ole', 'Ole', G_DOC, 'Ole-Regular.ttf'],
   ['QwitcherGrypen', 'Qwitcher Grypen', G_DOC, 'QwitcherGrypen-Regular.ttf'],
   ['Shalimar', 'Shalimar', G_DOC, 'Shalimar-Regular.ttf'],
   ['Waterfall', 'Waterfall', G_DOC, 'Waterfall-Regular.ttf'],
   ['Updock', 'Updock', G_DOC, 'Updock-Regular.ttf'],
+  ['BeVietnamPro', 'Be Vietnam Pro (chữ in)', G_PRINT, 'BeVietnamPro-Regular.ttf'],
+  ['Lora', 'Lora (in có chân)', G_PRINT, 'Lora.ttf'],
+  ['PlayfairDisplay', 'Playfair Display (tiêu đề)', G_PRINT, 'PlayfairDisplay.ttf'],
+  ['IBMPlexMono', 'IBM Plex Mono (đánh máy)', G_PRINT, 'IBMPlexMono-Regular.ttf'],
+  ['JetBrainsMono', 'JetBrains Mono (đánh máy)', G_PRINT, 'JetBrainsMono.ttf'],
 ].map(([key, name, group, file]) => ({ key, name, group, file }));
+/** Thứ tự hiển thị các nhóm; nhóm mới chưa liệt kê sẽ được thêm vào cuối. */
+const GROUP_ORDER = [G_NEAT, G_SIGN, G_DOC, G_PRINT];
+const allGroups = () => [...GROUP_ORDER, ...new Set(FONTS.map(f => f.group))].filter((g, i, a) => g && a.indexOf(g) === i);
 const fontByKey = k => FONTS.find(f => f.key === k) || FONTS[0];
 const SAMPLE = 'Bệnh nhân uống thuốc ngày 2 lần';
 const fontBytes = {}, fontReady = {}, baseRatio = {};
@@ -57,7 +74,9 @@ const imgStore = {};       // srcId -> {dataUrl, w, h}
 let zoom = 1, tool = 'text', prevTool = 'text', selected = null, nextId = 1, dirty = false;
 let pendingPlace = null;   // {srcId, sig}
 const cur = { font: 'PatrickHand', size: 18, color: '#1a2a7a', slant: 0, jitter: false,
-  fill: '#ffffff', autoFill: true, penColor: '#1a2a7a', penW: 1.6, hlColor: '#ffe14d', hlW: 12, trueRemove: true };
+  fill: '#ffffff', autoFill: true, penColor: '#1a2a7a', penW: 1.6, hlColor: '#ffe14d', hlW: 12, trueRemove: true,
+  eraseShape: 'rect', snapLines: true, fillMode: 'solid', feather: false, brushW: 16,
+  flattenFormat: 'auto', flattenQuality: 0.9, flattenDpi: 300 };
 const history = [];
 
 function toast(msg, ms = 2800) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
@@ -73,24 +92,73 @@ const R = deg => { const r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(
 const apply = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 
 /* ======================= Bộ chọn phông ======================= */
-function buildPicker() {
-  const panel = $('fontPanel'); panel.innerHTML = '';
-  for (const g of [G_NEAT, G_SIGN, G_DOC]) {
-    const h = document.createElement('div'); h.className = 'fg'; h.textContent = g; panel.appendChild(h);
-    for (const f of FONTS.filter(f => f.group === g)) {
-      const it = document.createElement('button'); it.className = 'fi'; it.dataset.key = f.key;
-      it.innerHTML = '<span class="nm"></span><span class="pv"></span>';
-      it.querySelector('.nm').textContent = f.name;
-      const pv = it.querySelector('.pv'); pv.textContent = SAMPLE; pv.style.fontFamily = cssFam(f.key);
-      it.onclick = () => { closePicker(); chooseFont(f.key); };
-      panel.appendChild(it);
+const PIN_KEY = 'fontPins', PREVIEW_KEY = 'fontPreviewText';
+let fontPins = [], fontPreview = SAMPLE, fontCoverage = {};
+try { const p = JSON.parse(localStorage.getItem(PIN_KEY) || '[]'); if (Array.isArray(p)) fontPins = p; } catch {}
+try { fontPreview = localStorage.getItem(PREVIEW_KEY) || SAMPLE; } catch {}
+const isPinned = k => fontPins.includes(k);
+const savePins = () => { try { localStorage.setItem(PIN_KEY, JSON.stringify(fontPins)); } catch {} };
+
+// Báo cáo độ phủ dấu tiếng Việt (do test/fonts-coverage.mjs sinh ra) -> gắn nhãn cảnh báo
+fetch('fonts/coverage.json').then(r => r.ok ? r.json() : null).then(j => {
+  if (j && j.fonts) { fontCoverage = j.fonts; if ($('fontList')) buildPicker(); }
+}).catch(() => {});
+
+// Chỉ tải phông khi mục xem trước lọt vào tầm nhìn: nhẹ hơn nhiều so với tải hết một lượt
+let fontObserver = null;
+function observePreviews() {
+  fontObserver?.disconnect();
+  fontObserver = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      loadFont(fontByKey(e.target.dataset.key)).catch(() => {});
+      fontObserver.unobserve(e.target);
     }
-  }
+  }, { root: $('fontPanel'), rootMargin: '160px' });
+  $('fontList').querySelectorAll('.pv').forEach(el => fontObserver.observe(el));
 }
-function openPicker() { FONTS.forEach(f => loadFont(f).catch(() => {})); $('fontPanel').classList.add('open'); $('fontPanel').querySelector('.fi.sel')?.scrollIntoView({ block: 'nearest' }); }
+
+function buildPicker() {
+  const list = $('fontList'); if (!list) return;
+  const q = ($('fontSearch').value || '').trim().toLowerCase();
+  const pvText = ($('fontPreviewText').value || '').trim() || SAMPLE;
+  list.innerHTML = '';
+  const match = f => !q || f.name.toLowerCase().includes(q) || f.key.toLowerCase().includes(q);
+  const section = (title, items) => {
+    if (!items.length) return;
+    const h = document.createElement('div'); h.className = 'fg'; h.textContent = title; list.appendChild(h);
+    for (const f of items) {
+      const it = document.createElement('div'); it.className = 'fi'; it.dataset.key = f.key;
+      it.innerHTML = '<span class="nm"></span><span class="pv"></span><button class="pin"></button>';
+      const nm = it.querySelector('.nm'); nm.textContent = f.name;
+      const cov = fontCoverage[f.file];
+      if (cov && cov.missing) {
+        const w = document.createElement('span'); w.className = 'warnGlyph'; w.textContent = '⚠';
+        w.title = `Phông này thiếu ${cov.missing.length} ký tự tiếng Việt: ${cov.missing}`;
+        nm.appendChild(w);
+      }
+      const pv = it.querySelector('.pv'); pv.textContent = pvText; pv.dataset.key = f.key; pv.style.fontFamily = cssFam(f.key);
+      const pin = it.querySelector('.pin');
+      pin.textContent = isPinned(f.key) ? '★' : '☆';
+      pin.title = isPinned(f.key) ? 'Bỏ ghim' : 'Ghim phông này lên đầu';
+      pin.classList.toggle('on', isPinned(f.key));
+      pin.onclick = e => { e.stopPropagation(); fontPins = isPinned(f.key) ? fontPins.filter(k => k !== f.key) : [...fontPins, f.key]; savePins(); buildPicker(); };
+      it.onclick = () => { closePicker(); chooseFont(f.key); };
+      list.appendChild(it);
+    }
+  };
+  if (!q) section('⭐ Đã ghim', FONTS.filter(f => isPinned(f.key) && match(f)));
+  for (const g of allGroups()) section(g, FONTS.filter(f => f.group === g && match(f)));
+  if (!list.children.length) list.innerHTML = '<div class="fg">Không tìm thấy phông nào</div>';
+  observePreviews();
+}
+function openPicker() { $('fontPanel').classList.add('open'); buildPicker(); $('fontPanel').querySelector('.fi.sel')?.scrollIntoView({ block: 'nearest' }); }
 function closePicker() { $('fontPanel').classList.remove('open'); }
 $('fontBtn').onclick = e => { e.stopPropagation(); $('fontPanel').classList.contains('open') ? closePicker() : openPicker(); };
 document.addEventListener('pointerdown', e => { if (!e.target.closest('.fp')) closePicker(); });
+$('fontSearch').oninput = () => buildPicker();
+$('fontPreviewText').oninput = () => { fontPreview = $('fontPreviewText').value; try { localStorage.setItem(PREVIEW_KEY, fontPreview); } catch {} buildPicker(); };
+$('fontPreviewText').value = fontPreview;
 async function chooseFont(key) {
   cur.font = key; syncControls();
   try { await loadFont(fontByKey(key)); } catch { toast('Không đọc được phông ' + key); return; }
@@ -128,6 +196,7 @@ async function openBytes(bytes, name, path) {
     if (pdfDoc) pdfDoc.destroy();
     pdfDoc = doc; origBytes = bytes; origName = name || 'tai-lieu.pdf'; origPath = path; lastSavePath = null;
     objects.forEach(o => o.el?.remove()); objects = []; history.length = 0; selected = null;
+    for (const k in imgStore) delete imgStore[k]; srcSeq = 1; pendingPlace = null;   // dọn ảnh của file trước, tránh rò rỉ bộ nhớ
     $('empty').hidden = true; $('pages').hidden = false; $('pages').innerHTML = ''; $('thumbs').innerHTML = '';
     pages = [];
     for (let n = 1; n <= doc.numPages; n++) {
@@ -221,7 +290,7 @@ $('viewer').addEventListener('scroll', () => {
 });
 
 /* ======================= Công cụ ======================= */
-const CTX_OF = { text: 'text', rect: 'rect', img: 'img', ink: null };
+const CTX_OF = { text: 'text', rect: 'rect', brush: 'rect', lasso: 'rect', img: 'img', ink: null };
 function setTool(t) {
   if (t !== 'pick') prevTool = t;
   tool = t; document.body.className = 'tool-' + t;
@@ -245,8 +314,13 @@ function syncControls() {
   const col = colorTarget();
   $('colorIn').value = col;
   document.querySelectorAll('.ctx .sw').forEach(s => s.classList.toggle('sel', s.dataset.c.toLowerCase() === col.toLowerCase()));
-  $('fillIn').value = selected?.type === 'rect' ? selected.color : cur.fill;
+  $('fillIn').value = selected && isMask(selected) ? selected.color : cur.fill;
   $('autoFillIn').checked = cur.autoFill;
+  document.querySelectorAll('[data-es]').forEach(b => b.classList.toggle('on', b.dataset.es === cur.eraseShape));
+  $('snapLines').checked = cur.snapLines;
+  $('fillModeIn').value = (selected && isMask(selected) ? selected.fillMode : cur.fillMode) || 'solid';
+  $('featherIn').checked = !!(selected && isMask(selected) ? selected.feather : cur.feather);
+  $('brushW').value = selected?.type === 'brush' ? selected.width : cur.brushW;
   $('penW').value = (selected?.type === 'ink' ? selected.width : (tool === 'hl' ? cur.hlW : cur.penW));
   $('rotIn').value = selected?.type === 'img' ? Math.round(selected.rot) : 0;
   $('recolorBtn').disabled = !(selected?.type === 'img' && selected.sig);
@@ -270,10 +344,15 @@ $('slantIn').oninput = () => { const v = parseFloat($('slantIn').value); if (v >
 $('jitterIn').onchange = () => { cur.jitter = $('jitterIn').checked; applyToSelected(o => o.type === 'text' && (o.jitter = cur.jitter)); };
 $('penW').oninput = () => { const v = parseFloat($('penW').value); if (!(v > 0)) return; if (selected?.type === 'ink') applyToSelected(o => o.width = v); else if (tool === 'hl') cur.hlW = v; else cur.penW = v; };
 $('rotIn').oninput = () => { const v = parseFloat($('rotIn').value); if (isFinite(v)) applyToSelected(o => o.type === 'img' && (o.rot = v)); };
-$('fillIn').oninput = () => { cur.fill = $('fillIn').value; applyToSelected(o => o.type === 'rect' && (o.color = cur.fill)); };
+$('fillIn').oninput = () => { cur.fill = $('fillIn').value; applyToSelected(o => isMask(o) && (o.color = cur.fill)); };
 $('autoFillIn').onchange = () => { cur.autoFill = $('autoFillIn').checked; };
+$('snapLines').onchange = () => { cur.snapLines = $('snapLines').checked; };
+$('brushW').oninput = () => { const v = parseFloat($('brushW').value); if (v > 0) { cur.brushW = v; applyToSelected(o => o.type === 'brush' && (o.width = v)); } };
+$('fillModeIn').onchange = () => { cur.fillMode = $('fillModeIn').value; applyToSelected(o => isMask(o) && (o.fillMode = cur.fillMode)); };
+$('featherIn').onchange = () => { cur.feather = $('featherIn').checked; applyToSelected(o => isMask(o) && (o.feather = cur.feather)); };
+document.querySelectorAll('[data-es]').forEach(b => b.onclick = () => { cur.eraseShape = b.dataset.es; if (tool !== 'erase') setTool('erase'); else syncControls(); });
 $('autoFillBtn').onclick = () => {
-  if (selected?.type === 'rect') { const c = sampleRing(pages[selected.page], selected); applyToSelected(o => o.color = c); cur.fill = c; syncControls(); toast('Đã lấy màu nền xung quanh: ' + c); }
+  if (selected && isMask(selected)) { const c = sampleRing(pages[selected.page], maskBox(selected)); applyToSelected(o => o.color = c); cur.fill = c; syncControls(); toast('Đã lấy màu nền xung quanh: ' + c); }
   else toast('Hãy chọn một vùng che trước (hoặc vẽ vùng mới, màu sẽ tự lấy)');
 };
 $('pickBtn').onclick = () => { if (!pdfDoc) return; setTool('pick'); toast('Bấm vào chỗ có màu nền muốn lấy'); };
@@ -312,8 +391,14 @@ function samplePoint(pg, x, y) {
 }
 
 /* ======================= Lịch sử (hoàn tác) ======================= */
-const KEYS = { text: ['x', 'y', 'size', 'color', 'font', 'text', 'slant', 'jitter', 'seed'], rect: ['x', 'y', 'w', 'h', 'color'],
+const KEYS = { text: ['x', 'y', 'size', 'color', 'font', 'text', 'slant', 'jitter', 'seed'],
+  rect: ['x', 'y', 'w', 'h', 'color', 'fillMode', 'feather'],
+  brush: ['pts', 'width', 'color', 'fillMode', 'feather'],
+  lasso: ['pts', 'color', 'fillMode', 'feather'],
   img: ['x', 'y', 'w', 'h', 'rot', 'srcId', 'sig'], ink: ['pts', 'dx', 'dy', 'color', 'width', 'mode'] };
+/** Các loại "vùng che" — dùng chung cho tẩy/xoá và flatten. */
+const MASK_TYPES = ['rect', 'brush', 'lasso'];
+const isMask = o => MASK_TYPES.includes(o.type);
 const plain = o => { const r = { id: o.id, type: o.type, page: o.page }; for (const k of KEYS[o.type]) r[k] = o[k]; return r; };
 const snap = () => ({ objs: objects.map(plain), del: pages.map(p => p.deleted) });
 function pushHistory(s = snap()) { history.push(JSON.stringify(s)); if (history.length > 300) history.shift(); setDirty(true); updateButtons(); }
@@ -342,11 +427,15 @@ function onLayerDown(e, pg) {
   if (tool === 'select') { select(null); return; }
   e.preventDefault();
   if (tool === 'text') createTextAt(pg, x, y);
-  else if (tool === 'erase') drawRect(e, pg, x, y);
+  else if (tool === 'erase') {
+    if (cur.eraseShape === 'brush') drawBrush(e, pg, x, y);
+    else if (cur.eraseShape === 'lasso') drawLasso(e, pg, x, y);
+    else drawRect(e, pg, x, y);
+  }
   else if (tool === 'pen' || tool === 'hl') drawInk(e, pg, x, y);
   else if (tool === 'pick') {
     const c = samplePoint(pg, x, y); cur.fill = c;
-    applyToSelected(o => o.type === 'rect' && (o.color = c));
+    applyToSelected(o => isMask(o) && (o.color = c));
     setTool(prevTool === 'pick' ? 'erase' : prevTool); toast('Đã lấy màu ' + c);
   } else if (tool === 'place' && pendingPlace) {
     const im = imgStore[pendingPlace.srcId], ar = im.h / im.w;
@@ -362,21 +451,119 @@ function createTextAt(pg, x, y) {
   const o = createObj({ type: 'text', page: pg.idx, x, y: Math.max(0, y - cur.size * LH / 2), size: cur.size, color: cur.color, font: cur.font, slant: cur.slant, jitter: cur.jitter, text: '' });
   o.isNew = true; select(o); o.ta.focus(); return o;
 }
+/* ---- Bám dòng chữ: lấy hộp bao từng dòng chữ của trang bằng pdf.js ---- */
+async function pageLines(pg) {
+  if (pg.lines) return pg.lines;
+  pg.lines = [];
+  try {
+    const tc = await pg.pdfPage.getTextContent();
+    const items = [];
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim()) continue;
+      // Lưu ý: item.width / item.height của pdf.js đã ở đơn vị điểm PDF (không phải
+      // đơn vị text-space), nên chỉ cần dựng hộp bao trong không gian PDF rồi đổi
+      // sang toạ độ hiển thị — nhân thêm ma trận text sẽ bị nhân đôi tỉ lệ.
+      const [a, b, c, d, e, f] = it.transform;
+      const la = Math.hypot(a, b) || 1, lb = Math.hypot(c, d) || 1;
+      const nx = [a / la, b / la], ny = [c / lb, d / lb];
+      const W = it.width || 0, H = it.height || 10;
+      const pts = [[0, 0], [W, 0], [W, H], [0, H]].map(([u, v]) =>
+        pg.vp1.convertToViewportPoint(e + nx[0] * u + ny[0] * v, f + nx[1] * u + ny[1] * v));
+      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      items.push({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), text: it.str });
+    }
+    items.sort((a, b) => a.y - b.y || a.x - b.x);
+    for (const it of items) {
+      const line = pg.lines.find(l => it.y < l.y + l.h + 2 && it.y + it.h > l.y - 2);
+      if (line) {
+        const x0 = Math.min(line.x, it.x), x1 = Math.max(line.x + line.w, it.x + it.w);
+        line.x = x0; line.w = x1 - x0;
+        const y0 = Math.min(line.y, it.y), y1 = Math.max(line.y + line.h, it.y + it.h);
+        line.y = y0; line.h = y1 - y0; line.text += ' ' + it.text;
+      } else pg.lines.push({ ...it });
+    }
+  } catch { /* PDF scan: không có lớp chữ để bám */ }
+  return pg.lines;
+}
+/** Nới khung che cho phủ đúng các dòng chữ giao với nó. */
+function snapRectToLines(lines, r) {
+  const hit = lines.filter(l => l.y < r.y + r.h && l.y + l.h > r.y && l.x < r.x + r.w && l.x + l.w > r.x);
+  if (!hit.length) return r;
+  const top = Math.min(...hit.map(l => l.y)) - 2, bot = Math.max(...hit.map(l => l.y + l.h)) + 2;
+  let x0 = r.x, x1 = r.x + r.w;
+  // khung đã phủ phần lớn bề ngang dòng thì kéo dài cho hết dòng
+  const full = hit.filter(l => (Math.min(x1, l.x + l.w) - Math.max(x0, l.x)) > l.w * 0.5);
+  if (full.length) { x0 = Math.min(x0, ...full.map(l => l.x)); x1 = Math.max(x1, ...full.map(l => l.x + l.w)); }
+  return { x: x0 - 2, y: top, w: (x1 - x0) + 4, h: bot - top };
+}
+/** Dòng chữ nằm dưới một điểm (bấm là che luôn cả dòng). */
+function lineAt(lines, x, y) {
+  return lines.find(l => x >= l.x - 6 && x <= l.x + l.w + 6 && y >= l.y - 6 && y <= l.y + l.h + 6);
+}
 function drawRect(e, pg, x0, y0) {
   const g = document.createElement('div'); g.className = 'ghost'; pg.layer.appendChild(g);
   let x1 = x0, y1 = y0;
-  const upd = () => { const x = Math.min(x0, x1), y = Math.min(y0, y1); Object.assign(g.style, { left: x * zoom + 'px', top: y * zoom + 'px', width: Math.abs(x1 - x0) * zoom + 'px', height: Math.abs(y1 - y0) * zoom + 'px' }); };
+  const boxOf = () => {
+    const raw = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) };
+    return (cur.snapLines && pg.lines && pg.lines.length) ? snapRectToLines(pg.lines, raw) : raw;
+  };
+  const upd = () => { const b = boxOf(); Object.assign(g.style, { left: b.x * zoom + 'px', top: b.y * zoom + 'px', width: b.w * zoom + 'px', height: b.h * zoom + 'px' }); };
   upd();
+  // nạp danh sách dòng chữ để khung tự bám (PDF scan sẽ bỏ qua)
+  if (cur.snapLines && !pg.lines) pageLines(pg).then(() => upd());
   const mv = ev => { [x1, y1] = ptIn(ev, pg); upd(); };
-  const up = () => {
+  const up = async () => {
     window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); g.remove();
-    const r = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) };
+    const tiny = Math.abs(x1 - x0) * zoom < 5 && Math.abs(y1 - y0) * zoom < 5;
+    if (tiny && cur.snapLines) {   // bấm gọn một chỗ -> che trọn dòng chữ tại đó
+      const l = lineAt(await pageLines(pg), x0, y0);
+      if (!l) return;
+      pushHistory();
+      const o = createObj({ type: 'rect', page: pg.idx, x: l.x - 2, y: l.y - 2, w: l.w + 4, h: l.h + 4,
+        color: cur.autoFill ? sampleRing(pg, l) : cur.fill, fillMode: cur.fillMode, feather: cur.feather });
+      setTool('text'); select(o);
+      toast('Đã che cả dòng chữ. Bấm lên vùng che để gõ chữ thay thế.', 4000);
+      return;
+    }
+    const r = boxOf();
     if (r.w < 3 || r.h < 3) return;
     const color = cur.autoFill ? sampleRing(pg, r) : cur.fill;
     pushHistory();
-    const o = createObj({ type: 'rect', page: pg.idx, ...r, color });
+    const o = createObj({ type: 'rect', page: pg.idx, ...r, color, fillMode: cur.fillMode, feather: cur.feather });
     setTool('text'); select(o);
     toast('Đã che. Bấm lên vùng che để gõ chữ thay thế · màu nền: ' + color, 4000);
+  };
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+}
+/** Cọ xoá: kéo nét, nét đó trở thành vùng bị xoá. */
+function drawBrush(e, pg, x, y) {
+  const probe = { x: x - 8, y: y - 8, w: 16, h: 16 };
+  const color = cur.autoFill ? sampleRing(pg, probe) : cur.fill;
+  const o = createObj({ type: 'brush', page: pg.idx, pts: [[+x.toFixed(2), +y.toFixed(2)]],
+    width: cur.brushW, color, fillMode: cur.fillMode, feather: cur.feather });
+  const before = snap(); before.objs = before.objs.filter(d => d.id !== o.id);
+  const mv = ev => { const [a, b] = ptIn(ev, pg), l = o.pts[o.pts.length - 1]; if (Math.hypot(a - l[0], b - l[1]) * zoom < 1.5) return; o.pts.push([+a.toFixed(2), +b.toFixed(2)]); layout(o); };
+  const up = () => {
+    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    if (o.pts.length === 1) o.pts.push([o.pts[0][0] + 0.01, o.pts[0][1]]);
+    layout(o); pushHistory(before); select(o);
+    toast('Đã xoá theo nét cọ. Kéo tiếp để xoá thêm.', 3000);
+  };
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+}
+/** Khoanh vùng tự do: vùng khoanh trở thành vùng bị xoá. */
+function drawLasso(e, pg, x, y) {
+  const probe = { x: x - 8, y: y - 8, w: 16, h: 16 };
+  const color = cur.autoFill ? sampleRing(pg, probe) : cur.fill;
+  const o = createObj({ type: 'lasso', page: pg.idx, pts: [[+x.toFixed(2), +y.toFixed(2)]],
+    color, fillMode: cur.fillMode, feather: cur.feather });
+  const before = snap(); before.objs = before.objs.filter(d => d.id !== o.id);
+  const mv = ev => { const [a, b] = ptIn(ev, pg), l = o.pts[o.pts.length - 1]; if (Math.hypot(a - l[0], b - l[1]) * zoom < 1.5) return; o.pts.push([+a.toFixed(2), +b.toFixed(2)]); layout(o); };
+  const up = () => {
+    window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+    if (o.pts.length < 3) { removeObj(o); return; }
+    layout(o); pushHistory(before); select(o);
+    toast('Đã che vùng khoanh. Khoanh tiếp để che thêm vùng khác.', 3000);
   };
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
 }
@@ -404,6 +591,12 @@ function createObj(d) {
     wireText(o);
   } else if (o.type === 'rect') {
     el.classList.add('rc'); el.innerHTML = tools + '<div class="rs"></div>';
+  } else if (o.type === 'brush' || o.type === 'lasso') {
+    el.classList.add('msk'); if (o.type === 'lasso') el.classList.add('ls'); if (o.feather) el.classList.add('feather');
+    el.innerHTML = tools + `<svg xmlns="http://www.w3.org/2000/svg">${o.type === 'lasso' ? '<polygon/>' : '<path/>'}</svg>`;
+    el.querySelector(o.type === 'lasso' ? 'polygon' : 'path').addEventListener('pointerdown', e => {
+      if (tool !== 'select') return; e.preventDefault(); e.stopPropagation(); select(o); startDrag(e, o);
+    });
   } else if (o.type === 'img') {
     el.classList.add('im'); el.innerHTML = tools + '<img alt=""><div class="rs"></div><div class="ro" title="Kéo để xoay"></div>';
     el.querySelector('img').src = imgStore[o.srcId].dataUrl;
@@ -416,13 +609,13 @@ function createObj(d) {
   el.querySelector('.mv').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); select(o); startDrag(e, o); });
   el.querySelector('.del').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); deleteObj(o); });
   el.querySelector('.rs')?.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); select(o); startResize(e, o); });
-  if (o.type === 'rect' || o.type === 'img') el.addEventListener('pointerdown', e => {
+  if (isMask(o) || o.type === 'img') el.addEventListener('pointerdown', e => {
     if (e.target.closest('.tools,.rs,.ro')) return;
     e.preventDefault(); e.stopPropagation();
-    if (tool === 'text' && o.type === 'rect') { const [x, y] = ptIn(e, pages[o.page]); createTextAt(pages[o.page], x, y); return; }
+    if (tool === 'text' && isMask(o)) { const [x, y] = ptIn(e, pages[o.page]); createTextAt(pages[o.page], x, y); return; }
     select(o); startDrag(e, o);
   });
-  if (o.type !== 'text') el.addEventListener('dblclick', () => { if (o.type === 'rect') addTextInRect(o); });
+  if (o.type !== 'text') el.addEventListener('dblclick', () => { if (isMask(o)) addTextInRect({ ...maskBox(o), page: o.page }); });
   pages[o.page].layer.appendChild(el);
   objects.push(o); layout(o);
   return o;
@@ -467,6 +660,15 @@ function inkBox(o) {
   const xs = o.pts.map(p => p[0]), ys = o.pts.map(p => p[1]), pad = o.width / 2 + 2;
   return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + 2 * pad, h: Math.max(...ys) - Math.min(...ys) + 2 * pad };
 }
+/** Hộp bao của một vùng che (để định vị DOM và lấy màu nền xung quanh). */
+function maskBox(o) {
+  if (o.type === 'rect') return { x: o.x, y: o.y, w: o.w, h: o.h };
+  const xs = o.pts.map(p => p[0]), ys = o.pts.map(p => p[1]);
+  const pad = o.type === 'brush' ? o.width / 2 + 2 : 1;
+  return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad,
+    w: Math.max(...xs) - Math.min(...xs) + 2 * pad, h: Math.max(...ys) - Math.min(...ys) + 2 * pad };
+}
+const polyPath = pts => 'M' + pts.map(p => `${p[0]} ${p[1]}`).join(' L ');
 
 function layout(o) {
   const el = o.el; if (!el) return;
@@ -486,8 +688,22 @@ function layout(o) {
     });
   } else if (o.type === 'rect' || o.type === 'img') {
     Object.assign(el.style, { left: o.x * zoom + 'px', top: o.y * zoom + 'px', width: o.w * zoom + 'px', height: o.h * zoom + 'px' });
-    if (o.type === 'rect') el.style.background = o.color;
+    if (o.type === 'rect') { el.style.background = o.color; el.classList.toggle('feather', !!o.feather); }
     else { el.style.transform = `rotate(${o.rot}deg)`; const im = el.querySelector('img'); if (im.getAttribute('src') !== imgStore[o.srcId].dataUrl) im.src = imgStore[o.srcId].dataUrl; }
+  } else if (o.type === 'brush' || o.type === 'lasso') {
+    const b = maskBox(o);
+    Object.assign(el.style, { left: b.x * zoom + 'px', top: b.y * zoom + 'px', width: b.w * zoom + 'px', height: b.h * zoom + 'px' });
+    const svg = el.querySelector('svg');
+    svg.setAttribute('width', b.w * zoom); svg.setAttribute('height', b.h * zoom); svg.setAttribute('viewBox', `${b.x} ${b.y} ${b.w} ${b.h}`);
+    if (o.type === 'lasso') {
+      const poly = svg.querySelector('polygon');
+      poly.setAttribute('points', o.pts.map(p => p.join(',')).join(' '));
+      poly.setAttribute('fill', o.color); poly.setAttribute('fill-opacity', o.feather ? 0.9 : 1);
+    } else {
+      const p = svg.querySelector('path');
+      p.setAttribute('d', polyPath(o.pts)); p.setAttribute('stroke', o.color);
+      p.setAttribute('stroke-width', o.width); p.setAttribute('stroke-opacity', o.feather ? 0.9 : 1);
+    }
   } else if (o.type === 'ink') {
     const b = inkBox(o);
     Object.assign(el.style, { left: (b.x + o.dx) * zoom + 'px', top: (b.y + o.dy) * zoom + 'px', width: b.w * zoom + 'px', height: b.h * zoom + 'px' });
@@ -502,7 +718,7 @@ function select(o) {
   if (o) {
     o.el.classList.add('sel');
     if (o.type === 'text') { cur.font = o.font; cur.size = o.size; cur.color = o.color; cur.slant = o.slant; cur.jitter = o.jitter; }
-    if (o.type === 'rect') cur.fill = o.color;
+    if (isMask(o)) { cur.fill = o.color; cur.fillMode = o.fillMode || 'solid'; cur.feather = !!o.feather; }
   }
   updateButtons(); syncControls();
 }
@@ -521,9 +737,12 @@ function track(onMove, onEnd) {
 function startDrag(e, o) {
   const sx = e.clientX, sy = e.clientY, s0 = snap(), pg = pages[o.page]; let moved = false;
   const ox = o.type === 'ink' ? o.dx : o.x, oy = o.type === 'ink' ? o.dy : o.y;
+  // cọ / khoanh không có x,y -> di chuyển bằng cách dịch toàn bộ điểm
+  const pts0 = (o.type === 'brush' || o.type === 'lasso') ? o.pts.map(p => [...p]) : null;
   track(ev => {
     moved = true; const dx = (ev.clientX - sx) / zoom, dy = (ev.clientY - sy) / zoom;
     if (o.type === 'ink') { o.dx = ox + dx; o.dy = oy + dy; }
+    else if (pts0) { o.pts = pts0.map(p => [p[0] + dx, p[1] + dy]); }
     else { o.x = Math.max(-o.w / 2 || -5, Math.min(pg.vp1.width - 5, ox + dx)); o.y = Math.max(-5, Math.min(pg.vp1.height - 5, oy + dy)); }
     layout(o);
   }, () => { if (moved) pushHistory(s0); });
@@ -577,17 +796,48 @@ $('recolorBtn').onclick = async () => {
 };
 async function recolor(dataUrl, color) {
   const im = await loadImage(dataUrl), c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
-  const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, c.width, c.height), [r, g, b] = hexRgb255(color);
-  for (let i = 0; i < d.data.length; i += 4) { d.data[i] = r; d.data[i + 1] = g; d.data[i + 2] = b; }
-  x.putImageData(d, 0, 0); return c.toDataURL('image/png');
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
+  const id = x.getImageData(0, 0, c.width, c.height), d = id.data, [r, g, b] = hexRgb255(color);
+  // Ảnh đã có alpha thật (PNG nền trong suốt): chỉ đổi màu, giữ nguyên độ trong suốt.
+  // Ảnh đục (JPG chụp/scan): dùng độ sáng làm alpha -> nền sáng thành trong suốt,
+  // giữ nguyên hình dạng nét. Trước đây ghi đè RGB cả ảnh nên JPG thành khối màu đặc.
+  let hasAlpha = false;
+  for (let i = 3; i < d.length; i += 4) if (d[i] < 250) { hasAlpha = true; break; }
+  if (hasAlpha) {
+    for (let i = 0; i < d.length; i += 4) { d[i] = r; d[i + 1] = g; d[i + 2] = b; }
+  } else {
+    for (let i = 0; i < d.length; i += 4) {
+      const L = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+      d[i] = r; d[i + 1] = g; d[i + 2] = b;
+      d[i + 3] = Math.round(Math.max(0, Math.min(1, (0.92 - L) / 0.72)) * 255);
+    }
+  }
+  x.putImageData(id, 0, 0); return c.toDataURL('image/png');
 }
 const hexRgb255 = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 
 // --- Hộp thoại chữ ký
 let sigTab = 'draw', libSel = null;
+let sigSrcImg = null, sigOut = null;   // ảnh gốc nhập vào + kết quả đã tách nền
 const pad = { strokes: [], color: '#1a2a7a', base: 3.2 };
 $('sigBtn').onclick = () => { if (!pdfDoc) return toast('Hãy mở file PDF trước'); openSig(); };
-function openSig(tab = 'draw') { $('sigModal').hidden = false; setSigTab(tab); requestAnimationFrame(sizePad); }
+function openSig(tab = 'draw') {
+  // Mở lại hộp thoại phải sạch trạng thái của lần trước: không còn chọn nhầm
+  // chữ ký cũ trong thư viện, không giữ ảnh đã tách nền của lần trước.
+  libSel = null; sigOut = null; sigSrcImg = null;
+  $('sigImgEmpty').hidden = false; $('sigImgCanvas').getContext('2d').clearRect(0, 0, $('sigImgCanvas').width, $('sigImgCanvas').height);
+  syncPadControls();
+  $('sigModal').hidden = false; setSigTab(tab); requestAnimationFrame(sizePad);
+}
+function syncPadControls() {
+  $('padW').value = pad.base;
+  document.querySelectorAll('.sw.ps').forEach(x => x.classList.toggle('sel', x.dataset.c.toLowerCase() === pad.color.toLowerCase()));
+}
+function closeAllModals() {
+  // Escape khi hộp thoại Lưu đang mở phải giải phóng promise trong save(), nếu không sẽ treo
+  if (!$('saveModal').hidden) { $('saveModal').querySelector('[data-close]')?.click(); return; }
+  if (!$('sigModal').hidden) $('sigModal').hidden = true;
+}
 function closeModal(m) { m.hidden = true; }
 document.querySelectorAll('.modal [data-close]').forEach(b => b.onclick = () => closeModal(b.closest('.modal')));
 document.querySelectorAll('.tabs [data-tab]').forEach(b => b.onclick = () => setSigTab(b.dataset.tab));
@@ -596,36 +846,50 @@ function setSigTab(t) {
   document.querySelectorAll('.tabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.dlg .tab').forEach(x => x.hidden = x.dataset.tab !== t);
   $('saveLibWrap').style.visibility = t === 'lib' ? 'hidden' : 'visible';
+  $('keepPadWrap').style.visibility = t === 'draw' ? 'visible' : 'hidden';
   if (t === 'lib') renderLib(); if (t === 'draw') requestAnimationFrame(sizePad);
 }
 const padC = $('pad');
+/** Hệ số phóng của canvas pad so với kích thước hiển thị (thường 2 để nét mịn). */
+function padScale() { const w = padC.getBoundingClientRect().width || 1; return padC.width / w; }
 function sizePad() { const r = padC.getBoundingClientRect(); if (!r.width) return; padC.width = Math.round(r.width * 2); padC.height = Math.round(r.height * 2); redrawPad(); }
-function redrawPad() { const x = padC.getContext('2d'); x.clearRect(0, 0, padC.width, padC.height); pad.strokes.forEach(s => drawStroke(x, s, 0)); }
-function drawStroke(x, s, from) {
+function redrawPad() { const x = padC.getContext('2d'); x.clearRect(0, 0, padC.width, padC.height); const k = padScale(); pad.strokes.forEach(s => drawStroke(x, s, 0, k)); }
+/**
+ * Vẽ nét lên canvas. Toạ độ nét được lưu theo đơn vị CSS px của pad (không phụ thuộc
+ * kích thước canvas), nên đổi cỡ cửa sổ hay xuất ảnh ở tỉ lệ khác đều cho kết quả
+ * nhất quán — trước đây nét lưu theo px canvas nên bị lệch khi canvas đổi cỡ.
+ * k = hệ số phóng khi vẽ.
+ */
+function drawStroke(x, s, from, k = 1) {
   // đường cong qua trung điểm, bề rộng thay đổi theo lực bút / tốc độ
   x.strokeStyle = pad.color; x.fillStyle = pad.color; x.lineCap = 'round'; x.lineJoin = 'round';
-  const p = s; if (p.length === 1) { x.beginPath(); x.arc(p[0].x, p[0].y, p[0].w / 2, 0, 7); x.fill(); return; }
+  const p = s; if (p.length === 1) { x.beginPath(); x.arc(p[0].x * k, p[0].y * k, p[0].w * k / 2, 0, 7); x.fill(); return; }
   for (let i = Math.max(1, from); i < p.length; i++) {
     const a = p[i - 1], b = p[i], pa = p[i - 2] || a;
-    const m0 = { x: (pa.x + a.x) / 2, y: (pa.y + a.y) / 2 }, m1 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    x.beginPath(); x.lineWidth = (a.w + b.w) / 2; x.moveTo(i === 1 ? a.x : m0.x, i === 1 ? a.y : m0.y); x.quadraticCurveTo(a.x, a.y, m1.x, m1.y); x.stroke();
+    const m0 = { x: (pa.x + a.x) / 2 * k, y: (pa.y + a.y) / 2 * k }, m1 = { x: (a.x + b.x) / 2 * k, y: (a.y + b.y) / 2 * k };
+    x.beginPath(); x.lineWidth = (a.w + b.w) / 2 * k; x.moveTo(i === 1 ? a.x * k : m0.x, i === 1 ? a.y * k : m0.y); x.quadraticCurveTo(a.x * k, a.y * k, m1.x, m1.y); x.stroke();
   }
 }
 let padCur = null;
 padC.addEventListener('pointerdown', e => {
   e.preventDefault(); padC.setPointerCapture(e.pointerId);
-  const r = padC.getBoundingClientRect(), k = padC.width / r.width;
+  const r = padC.getBoundingClientRect();
   const pt = (ev, prev) => {
-    const x = (ev.clientX - r.left) * k, y = (ev.clientY - r.top) * k, t = ev.timeStamp, B = pad.base * k;
+    const x = ev.clientX - r.left, y = ev.clientY - r.top, t = ev.timeStamp, B = pad.base;
     let w;
     if (ev.pointerType === 'pen' && ev.pressure > 0) w = B * (0.35 + 0.95 * ev.pressure);
     else if (!prev) w = B;
-    else { const v = Math.hypot(x - prev.x, y - prev.y) / Math.max(1, t - prev.t) / k; w = B * Math.max(0.4, Math.min(1.35, 1.35 - v * 0.45)); w = prev.w * 0.65 + w * 0.35; }
+    else { const v = Math.hypot(x - prev.x, y - prev.y) / Math.max(1, t - prev.t); w = B * Math.max(0.4, Math.min(1.35, 1.35 - v * 0.45)); w = prev.w * 0.65 + w * 0.35; }
     return { x, y, t, w };
   };
-  padCur = [pt(e)]; pad.strokes.push(padCur); drawStroke(padC.getContext('2d'), padCur, 0);
-  const mv = ev => { const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev]; for (const c of (evs.length ? evs : [ev])) { const l = padCur[padCur.length - 1], p = pt(c, l); if (Math.hypot(p.x - l.x, p.y - l.y) < 1.2) continue; padCur.push(p); } drawStroke(padC.getContext('2d'), padCur, padCur.length - 2); };
-  const up = () => { padC.removeEventListener('pointermove', mv); padC.removeEventListener('pointerup', up); padC.removeEventListener('pointercancel', up); padCur = null; };
+  padCur = [pt(e)]; pad.strokes.push(padCur); drawStroke(padC.getContext('2d'), padCur, 0, padScale());
+  const mv = ev => { const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev]; for (const c of (evs.length ? evs : [ev])) { const l = padCur[padCur.length - 1], p = pt(c, l); if (Math.hypot(p.x - l.x, p.y - l.y) < 1.2) continue; padCur.push(p); } drawStroke(padC.getContext('2d'), padCur, padCur.length - 2, padScale()); };
+  const up = () => {
+    padC.removeEventListener('pointermove', mv); padC.removeEventListener('pointerup', up); padC.removeEventListener('pointercancel', up);
+    padCur = null;
+    // Vẽ lại đầy đủ từ dữ liệu nét: bảo đảm canvas khớp 100% với những gì sẽ được đặt lên trang
+    redrawPad();
+  };
   padC.addEventListener('pointermove', mv); padC.addEventListener('pointerup', up); padC.addEventListener('pointercancel', up);
 });
 $('padUndo').onclick = () => { pad.strokes.pop(); redrawPad(); };
@@ -641,10 +905,10 @@ function trimCanvas(c, alphaMin = 8, padPx = 6) {
 }
 
 // --- Chữ ký từ ảnh: tách nền giấy (kể cả ảnh chụp bị sáng không đều)
-let sigSrcImg = null, sigOut = null;
+// (sigSrcImg / sigOut đã khai báo ở phần hộp thoại chữ ký phía trên)
 $('sigImgBtn').onclick = () => $('sigImgInput').click();
 $('sigImgInput').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; sigSrcImg = await loadImage(await fileToDataUrl(f)); processSigImage(); };
-['bgRemove', 'bgTol', 'sigRecolor', 'sigRecolorC', 'sigCrop'].forEach(id => $(id).addEventListener('input', () => sigSrcImg && processSigImage()));
+['bgRemove', 'bgTol', 'sigRecolor', 'sigRecolorC', 'sigCrop', 'sigWeight'].forEach(id => $(id).addEventListener('input', () => sigSrcImg && processSigImage()));
 function processSigImage() {
   const im = sigSrcImg, k = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight));
   const W = Math.max(1, Math.round(im.naturalWidth * k)), H = Math.max(1, Math.round(im.naturalHeight * k));
@@ -662,13 +926,14 @@ function processSigImage() {
     const sm = new Float32Array(gw * gh);   // làm mượt lưới 3x3, lấy max để nét chữ lớn không bị coi là giấy
     for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) { let m = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const yy = gy + j, xx = gx + i; if (yy >= 0 && yy < gh && xx >= 0 && xx < gw) m = Math.max(m, grid[yy * gw + xx]); } sm[gy * gw + gx] = m * 0.5 + grid[gy * gw + gx] * 0.5; }
     const tol = parseFloat($('bgTol').value), soft = 10 + tol * 0.5;
+    const wt = Math.max(0.3, Math.min(2.5, (parseFloat($('sigWeight').value) || 100) / 100));   // làm đậm / mảnh nét
     const rc = $('sigRecolor').checked ? hexRgb255($('sigRecolorC').value) : null;
     for (let y = 0; y < H; y++) for (let X = 0; X < W; X++) {
       const fx = Math.min(gw - 1.001, Math.max(0, X / B - 0.5)), fy = Math.min(gh - 1.001, Math.max(0, y / B - 0.5)), ix = Math.floor(fx), iy = Math.floor(fy), ax = fx - ix, ay = fy - iy;
       const ix1 = Math.min(gw - 1, ix + 1), iy1 = Math.min(gh - 1, iy + 1);
       const bg = (sm[iy * gw + ix] * (1 - ax) + sm[iy * gw + ix1] * ax) * (1 - ay) + (sm[iy1 * gw + ix] * (1 - ax) + sm[iy1 * gw + ix1] * ax) * ay;
       const i = y * W + X, dark = bg - L[i];
-      const a = Math.max(0, Math.min(1, (dark - tol * 0.6) / soft));
+      const a = Math.max(0, Math.min(1, ((dark - tol * 0.6) / soft) * wt));
       d[i * 4 + 3] = Math.round(a * 255);
       if (rc) { d[i * 4] = rc[0]; d[i * 4 + 1] = rc[1]; d[i * 4 + 2] = rc[2]; }
       else if (a > 0) { // làm đậm màu mực (bỏ phần lẫn màu giấy)
@@ -677,12 +942,55 @@ function processSigImage() {
     }
     x.putImageData(id, 0, 0);
   }
-  sigOut = $('sigCrop').checked && $('bgRemove').checked ? (trimCanvas(c, 40, 8) || c) : c;
+  const cropPad = Math.max(2, Math.round(Math.max(W, H) * 0.012));
+  sigOut = $('sigCrop').checked && $('bgRemove').checked ? (trimCanvas(c, 12, cropPad) || c) : c;
   const pv = $('sigImgCanvas'); pv.width = sigOut.width; pv.height = sigOut.height; pv.getContext('2d').drawImage(sigOut, 0, 0);
   $('sigImgEmpty').hidden = true;
 }
+// Ngưỡng tách nền tự động theo Otsu: tính trên độ sáng của chính ảnh đang nhập,
+// thay vì để người dùng mò thanh trượt cho từng ảnh sáng/tối khác nhau.
+function autoBgTol() {
+  if (!sigSrcImg) return null;
+  const k = Math.min(1, 480 / Math.max(sigSrcImg.naturalWidth, sigSrcImg.naturalHeight));
+  const W = Math.max(1, Math.round(sigSrcImg.naturalWidth * k)), H = Math.max(1, Math.round(sigSrcImg.naturalHeight * k));
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(sigSrcImg, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data, L = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) L[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < L.length; i++) hist[Math.max(0, Math.min(255, Math.round(L[i])))]++;
+  const total = L.length; let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+  let sumB = 0, wB = 0, best = -1, thr = 128;
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue; const wF = total - wB; if (!wF) break;
+    sumB += i * hist[i];
+    const mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) { best = between; thr = i; }
+  }
+  const sorted = Array.from(L).sort((a, b) => a - b);
+  const bg = sorted[Math.floor(sorted.length * 0.9)] ?? 255;   // độ sáng của giấy (phân vị 90%)
+  const tol = Math.max(8, Math.min(120, Math.round((bg - thr) / 1.0)));
+  $('bgTol').value = tol;
+  return tol;
+}
+$('bgAutoBtn').onclick = () => {
+  if (!sigSrcImg) return toast('Hãy chọn ảnh chữ ký trước');
+  const t = autoBgTol(); processSigImage();
+  toast('Đã tự chọn độ nhạy tách nền: ' + t);
+};
 
 // --- Thư viện chữ ký
+// Băm nội dung ảnh để phát hiện chữ ký trùng trong thư viện
+async function hashDataUrl(url) {
+  const bin = atob(url.split(',')[1] || ''), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  try {
+    const d = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    let h = 5381; for (const b of bytes) h = ((h << 5) + h + b) >>> 0; return 'djb2-' + h.toString(16);
+  }
+}
 const libApi = API ? { list: API.sigList, save: API.sigSave, del: API.sigDelete } : {
   list: async () => JSON.parse(localStorage.getItem('sigLib') || '[]'),
   save: async d => { const l = JSON.parse(localStorage.getItem('sigLib') || '[]'), id = 'sig-' + Date.now(); l.unshift({ id, dataUrl: d }); localStorage.setItem('sigLib', JSON.stringify(l)); return id; },
@@ -690,7 +998,24 @@ const libApi = API ? { list: API.sigList, save: API.sigSave, del: API.sigDelete 
 };
 async function renderLib() {
   const g = $('libGrid'), list = await libApi.list(); g.innerHTML = '';
+  const tab = g.parentElement; tab.querySelector('.libHead')?.remove();
   if (!list.length) { g.innerHTML = '<div class="libEmpty">Chưa có chữ ký nào. Hãy vẽ hoặc nhập ảnh, chữ ký sẽ được lưu ở đây.</div>'; return; }
+  const head = document.createElement('div'); head.className = 'libHead';
+  head.innerHTML = `<span><b>${list.length}</b> chữ ký trong thư viện</span>`;
+  const dupBtn = document.createElement('button');
+  dupBtn.textContent = '🧹 Dọn bản trùng';
+  dupBtn.onclick = async () => {
+    const seen = new Set(); let removed = 0;
+    for (const s of list) {
+      const h = await hashDataUrl(s.dataUrl);
+      if (seen.has(h)) { await libApi.del(s.id); removed++; if (libSel?.id === s.id) libSel = null; }
+      else seen.add(h);
+    }
+    toast(removed ? `Đã xoá ${removed} chữ ký trùng nhau` : 'Không có chữ ký trùng');
+    renderLib();
+  };
+  head.appendChild(dupBtn);
+  tab.insertBefore(head, g);
   for (const s of list) {
     const it = document.createElement('div'); it.className = 'libItem' + (libSel?.id === s.id ? ' sel' : '');
     it.innerHTML = '<img alt=""><button class="ld" title="Xóa khỏi thư viện">✕</button>'; it.querySelector('img').src = s.dataUrl;
@@ -701,17 +1026,51 @@ async function renderLib() {
   }
 }
 $('sigUse').onclick = () => useSignature();
+/** Ảnh PNG của chữ ký đang vẽ trên pad (null nếu chưa có nét).
+ *  Dựng từ dữ liệu nét ở tỉ lệ cố định nên kết quả không phụ thuộc kích thước canvas pad. */
+function padSignature() {
+  if (!pad.strokes.length) return null;
+  const S = 2, pad0 = 8;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxW = 0;
+  for (const s of pad.strokes) for (const p of s) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    if (p.w > maxW) maxW = p.w;
+  }
+  const m = pad0 + maxW / 2;
+  const w = Math.max(1, Math.ceil(maxX - minX + 2 * m)), h = Math.max(1, Math.ceil(maxY - minY + 2 * m));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * S)); c.height = Math.max(1, Math.round(h * S));
+  const x = c.getContext('2d');
+  x.translate((m - minX) * S, (m - minY) * S);
+  pad.strokes.forEach(s => drawStroke(x, s, 0, S));
+  return c.toDataURL('image/png');
+}
 async function useSignature() {
   let url = null;
   if (sigTab === 'draw') {
-    if (!pad.strokes.length) return toast('Hãy ký vào ô trước');
-    const t = trimCanvas(padC, 8, 6); url = t?.toDataURL('image/png');
+    url = padSignature();
+    if (!url) return toast('Hãy ký vào ô trước');
   } else if (sigTab === 'image') {
     if (!sigOut) return toast('Hãy chọn ảnh chữ ký');
     url = sigOut.toDataURL('image/png');
   } else { if (!libSel) return toast('Hãy chọn một chữ ký trong thư viện'); url = libSel.dataUrl; }
   if (!url) return;
-  if (sigTab !== 'lib' && $('saveLib').checked) { try { await libApi.save(url); } catch (e) { console.warn(e); } }
+
+  if (sigTab !== 'lib' && $('saveLib').checked) {
+    try {
+      // Chống trùng: chỉ lưu khi chưa có chữ ký y hệt trong thư viện
+      const h = await hashDataUrl(url), list = await libApi.list();
+      let dup = false;
+      for (const s of list) if (await hashDataUrl(s.dataUrl) === h) { dup = true; break; }
+      if (dup) toast('Chữ ký này đã có trong thư viện, không lưu lại');
+      else await libApi.save(url);
+    } catch (e) { console.warn(e); }
+  }
+
+  // Không giữ nét cũ trên pad -> lần mở sau bắt đầu với ô ký trắng
+  if (sigTab === 'draw' && !$('keepPad').checked) { pad.strokes = []; redrawPad(); }
+
   closeModal($('sigModal'));
   await startPlaceImage(url, true);
 }
@@ -719,54 +1078,207 @@ async function useSignature() {
 /* ======================= Lưu PDF ======================= */
 const toRgb = h => { const [r, g, b] = hexRgb255(h); return rgb(r / 255, g / 255, b / 255); };
 const dataUrlBytes = u => Uint8Array.from(atob(u.split(',')[1]), c => c.charCodeAt(0));
-async function flattenPage(doc, i, rects) {
-  // Vẽ lại trang thành ảnh 300 dpi, tô vùng che thẳng vào ảnh -> nội dung cũ bị xóa thật
-  const pg = pages[i], p = pg.pdfPage;
-  let scale = 300 / 72; const v0 = p.getViewport({ scale: 1, rotation: 0 });
-  scale = Math.min(scale, 7000 / Math.max(v0.width, v0.height));
+const FONT_FEATURES = { liga: false, clig: false, calt: false, dlig: false, frac: false, numr: false, dnom: false, kern: false };
+const subsetOk = {}, fontCharSets = {};
+/** Tập ký tự gốc của phông (đọc từ file .ttf), dùng để báo ký tự thiếu.
+ *  Không dùng font đã nhúng vì khi bật subset, tập ký tự đó chỉ lớn dần theo nội dung đã vẽ. */
+function charSetFor(key, buf) {
+  if (fontCharSets[key] === undefined) {
+    try { fontCharSets[key] = new Set(window.fontkit.create(buf).characterSet); } catch { fontCharSets[key] = null; }
+  }
+  return fontCharSets[key];
+}
+/** Thử nhúng với subset trên một tài liệu nháp để biết phông có hỗ trợ không,
+ *  tránh làm hỏng tài liệu thật nếu việc nhúng thất bại giữa chừng. */
+async function fontSupportsSubset(buf) {
+  try {
+    const d = await PDFDocument.create();
+    d.registerFontkit(window.fontkit);
+    await d.embedFont(new Uint8Array(buf), { subset: true, features: FONT_FEATURES });
+    return true;
+  } catch { return false; }
+}
+/**
+ * Tô nền thông minh cho vùng chữ nhật: lấy màu ngay ngoài 4 góc rồi nội suy
+ * (chuyển sắc) hoặc sao chép dải nền phía trên — tốt hơn nhiều so với tô một màu
+ * khi nền giấy không đều, có dải màu hoặc có dòng kẻ.
+ */
+function fillSmart(ctx, box, mask, k) {
+  const bx = Math.round(box.x), by = Math.round(box.y);
+  const bw = Math.max(1, Math.round(box.w)), bh = Math.max(1, Math.round(box.h));
+  const src = ctx.canvas;
+  const blur = mask.feather ? `blur(${Math.max(1, Math.round(2 * k))}px)` : '';
+  if (mask.fillMode === 'clone') {
+    const gap = Math.max(1, Math.round(3 * k));
+    const sy = by - bh - gap;
+    if (sy >= 0) {
+      const tmp = document.createElement('canvas'); tmp.width = bw; tmp.height = bh;
+      tmp.getContext('2d').drawImage(src, bx, sy, bw, bh, 0, 0, bw, bh);
+      ctx.save(); if (blur) ctx.filter = blur;
+      ctx.drawImage(tmp, bx, by); ctx.restore();
+      return;
+    }
+  }
+  const m = Math.max(1, Math.round(3 * k));
+  const pick = (x, y) => {
+    const d = ctx.getImageData(Math.max(0, Math.min(src.width - 1, x)), Math.max(0, Math.min(src.height - 1, y)), 1, 1).data;
+    return `rgb(${d[0]},${d[1]},${d[2]})`;
+  };
+  const tmp = document.createElement('canvas'); tmp.width = 2; tmp.height = 2;
+  const t = tmp.getContext('2d');
+  t.fillStyle = pick(bx - m, by - m); t.fillRect(0, 0, 1, 1);
+  t.fillStyle = pick(bx + bw + m, by - m); t.fillRect(1, 0, 1, 1);
+  t.fillStyle = pick(bx - m, by + bh + m); t.fillRect(0, 1, 1, 1);
+  t.fillStyle = pick(bx + bw + m, by + bh + m); t.fillRect(1, 1, 1, 1);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  if (blur) ctx.filter = blur;
+  ctx.drawImage(tmp, 0, 0, 2, 2, bx, by, bw, bh);
+  ctx.restore();
+}
+/**
+ * Vẽ một vùng che lên ctx.
+ * map(x, y) -> [cx, cy] đổi toạ độ trang (điểm) sang toạ độ canvas; k là hệ số phóng.
+ */
+function paintMask(ctx, mask, map, k) {
+  if (mask.type === 'brush') {
+    ctx.save();
+    ctx.strokeStyle = mask.color; ctx.fillStyle = mask.color;
+    ctx.lineWidth = mask.width * k; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (mask.feather) ctx.filter = `blur(${Math.max(1, Math.round(1.5 * k))}px)`;
+    if (mask.pts.length === 1) { const [cx, cy] = map(mask.pts[0][0], mask.pts[0][1]); ctx.beginPath(); ctx.arc(cx, cy, mask.width * k / 2, 0, 7); ctx.fill(); }
+    else { ctx.beginPath(); mask.pts.forEach(([a, b], i) => { const [cx, cy] = map(a, b); i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy); }); ctx.stroke(); }
+    ctx.restore();
+  } else if (mask.type === 'lasso') {
+    ctx.save();
+    ctx.fillStyle = mask.color;
+    if (mask.feather) ctx.filter = `blur(${Math.max(1, Math.round(1.5 * k))}px)`;
+    ctx.beginPath();
+    mask.pts.forEach(([a, b], i) => { const [cx, cy] = map(a, b); i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy); });
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  } else {
+    const p = [[mask.x, mask.y], [mask.x + mask.w, mask.y], [mask.x + mask.w, mask.y + mask.h], [mask.x, mask.y + mask.h]].map(([a, b]) => map(a, b));
+    const xs = p.map(q => q[0]), ys = p.map(q => q[1]);
+    const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    if (mask.fillMode === 'gradient' || mask.fillMode === 'clone') fillSmart(ctx, box, mask, k);
+    else {
+      ctx.save(); ctx.fillStyle = mask.color;
+      if (mask.feather) ctx.filter = `blur(${Math.max(1, Math.round(1.5 * k))}px)`;
+      ctx.beginPath(); p.forEach(([a, b], i) => i ? ctx.lineTo(a, b) : ctx.moveTo(a, b)); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+}
+/** Vẽ lại một trang thành ảnh và tô các vùng che lên đó. */
+async function renderMaskedPage(pg, masks, opts = {}) {
+  const p = pg.pdfPage;
+  const v0 = p.getViewport({ scale: 1, rotation: 0 });
+  const scale = Math.min((opts.dpi || 300) / 72, 7000 / Math.max(v0.width, v0.height));
   const vp0 = p.getViewport({ scale, rotation: 0 });
   const c = document.createElement('canvas'); c.width = Math.ceil(vp0.width); c.height = Math.ceil(vp0.height);
-  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
   await p.render({ canvasContext: x, viewport: vp0, intent: 'print' }).promise;
-  for (const r of rects) {
-    const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]].map(([a, b]) => { const [px, py] = apply(pg.M, a, b); return vp0.convertToViewportPoint(px, py); });
-    x.fillStyle = r.color; x.beginPath(); pts.forEach(([a, b], k) => k ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill();
+  for (const m of masks) {
+    const map = (a, b) => { const [px, py] = apply(pg.M, a, b); return vp0.convertToViewportPoint(px, py); };
+    paintMask(x, m, map, scale);
   }
-  const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
-  const img = await doc.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+  return c;
+}
+/** Trang chữ (gần như đơn sắc) nên dùng PNG cho sắc nét; trang ảnh/scan dùng JPEG cho nhẹ.
+ *  Đếm tỉ lệ điểm ảnh có màu ĐẬM thay vì độ bão hoà trung bình — nền giấy màu kem
+ *  (R,G,B hơi lệch nhau) vẫn là trang chữ, không được coi là ảnh màu. */
+function pickAutoFormat(c) {
+  const s = 160, k = Math.min(1, s / Math.max(c.width, c.height));
+  const t = document.createElement('canvas');
+  t.width = Math.max(1, Math.round(c.width * k)); t.height = Math.max(1, Math.round(c.height * k));
+  const tx = t.getContext('2d', { willReadFrequently: true });
+  tx.drawImage(c, 0, 0, t.width, t.height);
+  let n = 0, strong = 0;
+  try {
+    const d = tx.getImageData(0, 0, t.width, t.height).data;
+    for (let i = 0; i < d.length; i += 4) {
+      n++;
+      if (Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) > 28) strong++;
+    }
+  } catch { return 'jpeg'; }
+  return n && strong / n < 0.02 ? 'png' : 'jpeg';
+}
+async function flattenPage(doc, i, masks, opts = {}) {
+  // Vẽ lại trang thành ảnh rồi tô vùng che thẳng vào ảnh -> nội dung cũ bị xóa thật
+  const pg = pages[i], p = pg.pdfPage;
+  const c = await renderMaskedPage(pg, masks, opts);
+  const fmt = opts.format === 'png' ? 'png' : opts.format === 'jpeg' ? 'jpeg' : pickAutoFormat(c);
+  const blob = await new Promise(res => c.toBlob(res, fmt === 'png' ? 'image/png' : 'image/jpeg', opts.quality ?? 0.9));
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const img = fmt === 'png' ? await doc.embedPng(buf) : await doc.embedJpg(buf);
   const [x0, y0, x1, y1] = p.view;
   const np = doc.insertPage(i, [x1 - x0, y1 - y0]);
   np.setMediaBox(x0, y0, x1 - x0, y1 - y0);
   np.drawImage(img, { x: x0, y: y0, width: x1 - x0, height: y1 - y0 });
   np.setRotation(degrees(((pg.rotate % 360) + 360) % 360));
   doc.removePage(i + 1);
-  return np;
+  return { page: np, bytes: blob.size, format: fmt };
 }
-async function buildPdf(trueRemove) {
+/** Ảnh vá cho vùng che có nền chuyển sắc / sao chép / mờ mép (chế độ chỉ che phủ). */
+function maskPatch(pg, o) {
+  const k = canvasScale(pg), b = maskBox(o), pad = Math.ceil(6 * k);
+  const sx = Math.round(b.x * k) - pad, sy = Math.round(b.y * k) - pad;
+  const w = Math.max(1, Math.round(b.w * k) + 2 * pad), h = Math.max(1, Math.round(b.h * k) + 2 * pad);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(pg.canvas, sx, sy, w, h, 0, 0, w, h);
+  paintMask(x, o, (a, bb) => [(a - b.x) * k + pad, (bb - b.y) * k + pad], k);
+  return { dataUrl: c.toDataURL('image/png'), box: { x: b.x - pad / k, y: b.y - pad / k, w: w / k, h: h / k } };
+}
+async function buildPdf(trueRemove, flatOpts = {}) {
   const doc = await PDFDocument.load(origBytes, { ignoreEncryption: true, updateMetadata: false });
   doc.registerFontkit(window.fontkit);
   const items = objects.filter(o => !(o.type === 'text' && !o.text.trim()) && !pages[o.page].deleted);
   const docPages = doc.getPages(), flattened = new Set();
+  let flatBytes = 0;
   if (trueRemove) for (const pg of pages) {
-    const rects = items.filter(o => o.type === 'rect' && o.page === pg.idx);
-    if (rects.length && !pg.deleted) { busy(true, `Đang xóa hẳn nội dung bị che (trang ${pg.idx + 1})…`); docPages[pg.idx] = await flattenPage(doc, pg.idx, rects); flattened.add(pg.idx); }
+    const masks = items.filter(o => isMask(o) && o.page === pg.idx);
+    if (masks.length && !pg.deleted) {
+      busy(true, `Đang xóa hẳn nội dung bị che (trang ${pg.idx + 1})…`);
+      const r = await flattenPage(doc, pg.idx, masks, flatOpts);
+      docPages[pg.idx] = r.page; flattened.add(pg.idx); flatBytes += r.bytes;
+    }
   }
   busy(true, 'Đang tạo PDF…');
   const fonts = {}, imgs = {}, missing = {};
   for (const key of new Set(items.filter(o => o.type === 'text').map(o => o.font))) {
     const buf = await loadFont(fontByKey(key));
-    fonts[key] = await doc.embedFont(new Uint8Array(buf), { subset: false, features: { liga: false, clig: false, calt: false, dlig: false, frac: false, numr: false, dnom: false, kern: false } });
+    // Nhúng theo subset để PDF nhẹ hơn nhiều khi dùng nhiều phông; có nhánh dự phòng.
+    if (subsetOk[key] === undefined) subsetOk[key] = await fontSupportsSubset(buf);
+    fonts[key] = await doc.embedFont(new Uint8Array(buf), { subset: subsetOk[key], features: FONT_FEATURES });
   }
   for (const o of items) {
     const pg = pages[o.page], page = docPages[o.page], rot = ((pg.rotate % 360) + 360) % 360;
-    if (o.type === 'rect') {
+    if (isMask(o)) {
       if (flattened.has(o.page)) continue;
-      const pts = [[o.x, o.y], [o.x + o.w, o.y + o.h]].map(([a, b]) => apply(pg.M, a, b));
-      page.drawRectangle({ x: Math.min(pts[0][0], pts[1][0]), y: Math.min(pts[0][1], pts[1][1]), width: Math.abs(pts[1][0] - pts[0][0]), height: Math.abs(pts[1][1] - pts[0][1]), color: toRgb(o.color), borderWidth: 0 });
+      if ((o.fillMode && o.fillMode !== 'solid') || o.feather) {
+        // Nền chuyển sắc / sao chép / mờ mép -> nhúng ảnh vá đã dựng từ chính trang
+        const patch = maskPatch(pg, o), key = 'patch-' + o.id, b = patch.box;
+        imgs[key] ??= await doc.embedPng(dataUrlBytes(patch.dataUrl));
+        const m = [pg.M, T(b.x, b.y + b.h), S(1, -1)].reduce(mul);
+        page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(...m));
+        page.drawImage(imgs[key], { x: 0, y: 0, width: b.w, height: b.h });
+        page.pushOperators(PDFLib.popGraphicsState());
+      } else if (o.type === 'rect') {
+        const pts = [[o.x, o.y], [o.x + o.w, o.y + o.h]].map(([a, b]) => apply(pg.M, a, b));
+        page.drawRectangle({ x: Math.min(pts[0][0], pts[1][0]), y: Math.min(pts[0][1], pts[1][1]), width: Math.abs(pts[1][0] - pts[0][0]), height: Math.abs(pts[1][1] - pts[0][1]), color: toRgb(o.color), borderWidth: 0 });
+      } else {
+        // Cọ / khoanh một màu -> vẽ vector cho nét sắc
+        const m = mul(pg.M, S(1, -1));
+        page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(...m));
+        if (o.type === 'brush') page.drawSvgPath(polyPath(o.pts), { x: 0, y: 0, borderColor: toRgb(o.color), borderWidth: o.width, borderLineCap: PDFLib.LineCapStyle.Round });
+        else page.drawSvgPath(polyPath(o.pts) + ' Z', { x: 0, y: 0, color: toRgb(o.color) });
+        page.pushOperators(PDFLib.popGraphicsState());
+      }
     } else if (o.type === 'text') {
       const font = fonts[o.font], br = baseRatio[o.font] ?? measureBaseline(o.font), text = o.text.normalize('NFC');
-      const cs = new Set(font.getCharacterSet());
-      for (const ch of text) if (!/\s/.test(ch) && !cs.has(ch.codePointAt(0))) (missing[o.font] ??= new Set()).add(ch);
+      const cs = charSetFor(o.font, fontBytes[o.font]);
+      if (cs) for (const ch of text) if (!/\s/.test(ch) && !cs.has(ch.codePointAt(0))) (missing[o.font] ??= new Set()).add(ch);
       lineGeom(o, text).forEach((g, i) => {
         if (!g.text.length) return;
         const [px, py] = pg.vp1.convertToPdfPoint(o.x + g.dx, o.y + i * o.size * LH + br * o.size + g.dy);
@@ -793,25 +1305,48 @@ async function buildPdf(trueRemove) {
   const del = pages.filter(p => p.deleted).map(p => p.idx).sort((a, b) => b - a);
   if (del.length === pages.length) throw new Error('Không thể xóa hết tất cả các trang');
   del.forEach(i => doc.removePage(i));
-  return { bytes: await doc.save(), missing, flattened: flattened.size };
+  return { bytes: await doc.save(), missing, flattened: flattened.size, flatBytes };
 }
 function saveName() { return origName.replace(/\.pdf$/i, '') + '-da-chinh-sua.pdf'; }
+/** Bật/tắt phần tuỳ chọn chất lượng ảnh trong hộp thoại Lưu. */
+function syncFlatOpts() {
+  const on = $('trueRemove').checked;
+  $('flatOpts').hidden = !on;
+  const fmt = $('flatFormat').value;
+  $('flatQuality').disabled = fmt === 'png';
+  $('flatHint').textContent = fmt === 'png' ? '· PNG giữ nét tuyệt đối, file thường nặng hơn'
+    : fmt === 'jpeg' ? '· JPEG nhẹ hơn nhưng chữ nhỏ có thể hơi mờ'
+      : '· Tự động: PNG cho trang chữ, JPEG cho trang scan/ảnh';
+}
+$('trueRemove').onchange = syncFlatOpts;
+$('flatFormat').onchange = syncFlatOpts;
+$('flatDpi').onchange = syncFlatOpts;
+$('flatQuality').oninput = () => { $('flatQualityLbl').textContent = $('flatQuality').value; };
 async function save(saveAs) {
   if (!pdfDoc) return;
   document.activeElement?.blur?.();
-  const nRect = objects.filter(o => o.type === 'rect' && !pages[o.page].deleted).length;
-  if (nRect) {
-    $('saveInfo').textContent = `Có ${nRect} vùng tẩy xóa trên ${new Set(objects.filter(o => o.type === 'rect').map(o => o.page)).size} trang.`;
-    $('trueRemove').checked = cur.trueRemove; $('saveModal').hidden = false;
+  const masks = objects.filter(o => isMask(o) && !pages[o.page].deleted);
+  if (masks.length) {
+    $('saveInfo').textContent = `Có ${masks.length} vùng tẩy xóa trên ${new Set(masks.map(o => o.page)).size} trang.`;
+    $('trueRemove').checked = cur.trueRemove;
+    $('flatFormat').value = cur.flattenFormat; $('flatDpi').value = String(cur.flattenDpi);
+    $('flatQuality').value = Math.round(cur.flattenQuality * 100); $('flatQualityLbl').textContent = Math.round(cur.flattenQuality * 100);
+    syncFlatOpts();
+    $('saveModal').hidden = false;
     const ok = await new Promise(res => { $('saveGo').onclick = () => res(true); $('saveModal').querySelectorAll('[data-close]').forEach(b => b.onclick = () => res(false)); });
-    $('saveModal').hidden = true; if (!ok) return; cur.trueRemove = $('trueRemove').checked;
+    $('saveModal').hidden = true; if (!ok) return;
+    cur.trueRemove = $('trueRemove').checked;
+    cur.flattenFormat = $('flatFormat').value;
+    cur.flattenDpi = parseFloat($('flatDpi').value) || 300;
+    cur.flattenQuality = (parseFloat($('flatQuality').value) || 90) / 100;
   }
-  return doSave(saveAs, nRect ? cur.trueRemove : false);
+  return doSave(saveAs, masks.length ? cur.trueRemove : false);
 }
 async function doSave(saveAs, trueRemove) {
   busy(true, 'Đang tạo PDF…');
   try {
-    const { bytes, missing, flattened } = await buildPdf(trueRemove);
+    const flatOpts = { format: cur.flattenFormat, quality: cur.flattenQuality, dpi: cur.flattenDpi };
+    const { bytes, missing, flattened, flatBytes } = await buildPdf(trueRemove, flatOpts);
     busy(false);
     let where;
     if (API) {
@@ -826,7 +1361,7 @@ async function doSave(saveAs, trueRemove) {
     }
     setDirty(false);
     const miss = Object.entries(missing).map(([k, set]) => `${fontByKey(k).name}: ${[...set].join(' ')}`);
-    const msg = `Đã lưu “${where.split(/[\\/]/).pop()}”` + (flattened ? ` · đã xóa hẳn nội dung bị che trên ${flattened} trang` : '') + (miss.length ? ` · Lưu ý, phông không có ký tự → ${miss.join('; ')}` : '');
+    const msg = `Đã lưu “${where.split(/[\\/]/).pop()}”` + (flattened ? ` · đã xóa hẳn nội dung bị che trên ${flattened} trang (ảnh ${Math.round(flatBytes / 1024)} KB)` : '') + (miss.length ? ` · Lưu ý, phông không có ký tự → ${miss.join('; ')}` : '');
     toast(msg, 6000); status(msg);
     return where;
   } catch (e) { console.error(e); toast('Lỗi khi lưu PDF: ' + (e.message || e), 7000); status('Lỗi khi lưu', 'err'); }
@@ -838,11 +1373,12 @@ $('saveAsBtn').onclick = () => save(true);
 /* ======================= Phím tắt ======================= */
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase(), c = e.ctrlKey || e.metaKey;
+  // Khi có hộp thoại mở: chỉ xử lý Escape, chặn mọi phím tắt khác (tránh Ctrl+S lưu ngoài ý muốn)
+  if (!$('sigModal').hidden || !$('saveModal').hidden) { if (k === 'escape') { e.preventDefault(); closeAllModals(); } return; }
   if (c && k === 's') { e.preventDefault(); save(e.shiftKey); return; }
   if (c && k === 'o') { e.preventDefault(); openDialog(); return; }
   if (c && (k === '=' || k === '+')) { e.preventDefault(); zoomIn(); return; }
   if (c && k === '-') { e.preventDefault(); zoomOut(); return; }
-  if (!$('sigModal').hidden || !$('saveModal').hidden) { if (k === 'escape') { $('sigModal').hidden = true; } return; }
   const ae = document.activeElement?.tagName; if (ae === 'TEXTAREA' || ae === 'INPUT') return;
   if (c && k === 'z') { e.preventDefault(); undo(); }
   else if ((k === 'delete' || k === 'backspace') && selected) { e.preventDefault(); deleteObj(selected); }
@@ -856,11 +1392,16 @@ window.addEventListener('keydown', e => {
 
 /* ======================= Khởi động ======================= */
 buildPicker(); syncControls(); updateButtons();
-loadFont(FONTS[0]).then(() => status('Sẵn sàng · 17 phông viết tay · chạy ngoại tuyến')).catch(() => status('Lỗi tải phông', 'err'));
+loadFont(FONTS[0]).then(() => status(`Sẵn sàng · ${FONTS.length} phông · chạy ngoại tuyến`)).catch(() => status('Lỗi tải phông', 'err'));
 if (API) {
   API.initialFile().then(f => f && openBytes(f.data, f.name, f.path));
   API.onOpenPath(async p => { const f = await API.readPdf(p); openBytes(f.data, f.name, f.path); });
 }
 // dùng cho kiểm thử tự động
 window.__app = { openBytes, createObj, save, doSave, buildPdf, setTool, chooseFont, sampleRing, select, startPlaceImage, openSig, setSigTab, useSignature, processSigImage,
-  get objects() { return objects; }, get pages() { return pages; }, get zoom() { return zoom; }, setZoom, imgStore, baseRatio, cur, pad, loadImage, get sigOut() { return sigOut; } };
+  get objects() { return objects; }, get pages() { return pages; }, get zoom() { return zoom; }, setZoom, imgStore, baseRatio, cur, pad, loadImage, get sigOut() { return sigOut; },
+  libApi, recolor, trimCanvas, hashDataUrl, autoBgTol, redrawPad, closeAllModals, padC, padSignature, drawStroke,
+  FONTS, loadFont, fontBytes, charSetFor, pdfjs: pdfjsLib,
+  pageLines, snapRectToLines, lineAt, maskBox, maskPatch, paintMask, renderMaskedPage, pickAutoFormat, syncFlatOpts,
+  get libSel() { return libSel; }, setLibSel: v => { libSel = v; },
+  get sigSrcImg() { return sigSrcImg; }, setSigSrcImg: v => { sigSrcImg = v; } };

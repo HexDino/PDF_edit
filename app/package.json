@@ -1,7 +1,7 @@
 {
   "name": "trinh-sua-pdf",
   "productName": "Trình sửa PDF",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Trình sửa PDF – thêm chữ viết tay, tẩy xóa, chữ ký",
   "author": "Nguyễn Thanh Hưng",
   "main": "main.js",
@@ -12,7 +12,11 @@
     "dist": "npm run build",
     "test": "node test/smoke.mjs",
     "test:e2e": "node test/e2e.mjs",
-    "test:overlay": "node test/overlay.mjs"
+    "test:overlay": "node test/overlay.mjs",
+    "test:signature": "node test/signature.mjs",
+    "test:erase": "node test/erase.mjs",
+    "test:fonts": "node test/fonts-coverage.mjs && node test/fonts-export.mjs",
+    "fonts:fetch": "node test/fonts-fetch.mjs"
   },
   "devDependencies": {
     "electron": "^33.4.11",

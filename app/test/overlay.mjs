@@ -1,12 +1,13 @@
 import { _electron as electron } from 'playwright-core';
 import fs from 'fs';
-import { APP_ROOT, OUT, electronBin, testFile } from './_paths.mjs';
+import { APP_ROOT, OUT, electronBin, testFile, electronEnv } from './_paths.mjs';
 
 fs.mkdirSync(OUT, { recursive: true });
 
 const app = await electron.launch({
   executablePath: electronBin,
   args: [APP_ROOT, '--no-sandbox', testFile('scan-test.pdf')],
+  env: electronEnv,
 });
 const w = await app.firstWindow();
 await w.waitForFunction(
