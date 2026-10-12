@@ -164,7 +164,7 @@ Thêm `fillMode` cho mỗi mask: `'color' | 'gradient' | 'clone'` (mặc định
 ### 6.6 Bản web
 - ~~Đồng bộ cọ xoá + lasso, snap dòng chữ, tuỳ chọn chất lượng khi lưu~~ — **đã bỏ bản web.**
 
-**Nghiệm thu:** mở rộng `test/overlay.mjs` với mask brush/lasso/snap; xuất PNG vs JPEG và so dung lượng; kiểm tra PDF xoay 90/180/270 vẫn che đúng vị trí.
+**Nghiệm thu:** mở rộng `test/overlay.mjs` với mask brush/lasso/snap; xuất PNG vs JPEG và so dung lượng; ~~kiểm tra PDF xoay 90/180/270 vẫn che đúng vị trí~~ → **đã làm** ở `test/rotation.mjs` (7/7), và nó phát hiện 2 lỗi thật: gộp nhầm dòng chữ và khung bám dòng quá mỏng khi trang xoay 90/270 — cả hai đã sửa.
 
 ---
 

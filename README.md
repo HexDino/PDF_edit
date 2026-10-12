@@ -93,6 +93,12 @@ cd ../..
   npm run test:erase
   ```
 
+- **PDF xoay trang** (0/90/180/270): bám dòng chữ và vị trí vùng che sau khi xuất:
+
+  ```bash
+  npm run test:rotation
+  ```
+
 - **Phiên chỉnh sửa** (lưu kèm, mở lại là khôi phục, chống dán nhầm sang file khác):
 
   ```bash
@@ -134,7 +140,7 @@ Các phông viết tay, phông chữ in và **Be Vietnam Pro** lấy từ [Googl
 - File `.exe` **chưa ký số** — Windows SmartScreen có thể cảnh báo khi chạy lần đầu.
 - Khi bật **xóa hẳn**, các trang có vùng che trở thành **ảnh** (mất lớp chữ vector trên trang đó).
   Chọn **PNG** để giữ nét tối đa hoặc giảm **dpi** để file nhẹ hơn.
-- **Không xoay trang** PDF.
+- **Không đổi hướng trang** trong app (nhưng PDF đã xoay sẵn thì xử lý đúng: bám dòng chữ và vị trí vùng che đều chính xác ở cả 4 hướng 0/90/180/270 — có test riêng).
 - **Không hỗ trợ** PDF có mật khẩu / mã hóa.
 - File phiên `‹tên›.tsp.json` nằm cạnh PDF gốc và chứa **nội dung bạn đã thêm** (chữ thay thế, chữ ký, vị trí các vùng che). Nó **không** chứa nội dung gốc bị che, nhưng vẫn cho thấy bạn đã sửa ở đâu — nên khi gửi PDF cho người khác thì đừng gửi kèm file này.
 

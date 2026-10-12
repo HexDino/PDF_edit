@@ -500,44 +500,61 @@ async function pageLines(pg) {
   pg.lines = [];
   try {
     const tc = await pg.pdfPage.getTextContent();
+    // Gộp mảnh chữ thành dòng trong hệ toạ độ KHÔNG xoay: với trang xoay 90/270, gộp theo
+    // trục y của khung nhìn sẽ dính các dòng khác nhau vào làm một.
+    const vp0 = pg.pdfPage.getViewport({ scale: 1, rotation: 0 });
+    const box = pts => { const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }; };
     const items = [];
     for (const it of tc.items) {
       if (!it.str || !it.str.trim()) continue;
-      // Lưu ý: item.width / item.height của pdf.js đã ở đơn vị điểm PDF (không phải
-      // đơn vị text-space), nên chỉ cần dựng hộp bao trong không gian PDF rồi đổi
-      // sang toạ độ hiển thị — nhân thêm ma trận text sẽ bị nhân đôi tỉ lệ.
+      // item.width/height của pdf.js đã ở đơn vị điểm PDF -> không nhân thêm ma trận text
       const [a, b, c, d, e, f] = it.transform;
       const la = Math.hypot(a, b) || 1, lb = Math.hypot(c, d) || 1;
       const nx = [a / la, b / la], ny = [c / lb, d / lb];
       const W = it.width || 0, H = it.height || 10;
-      const pts = [[0, 0], [W, 0], [W, H], [0, H]].map(([u, v]) =>
-        pg.vp1.convertToViewportPoint(e + nx[0] * u + ny[0] * v, f + nx[1] * u + ny[1] * v));
-      const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
-      items.push({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), text: it.str });
+      const pdf = [[0, 0], [W, 0], [W, H], [0, H]].map(([u, v]) => [e + nx[0] * u + ny[0] * v, f + nx[1] * u + ny[1] * v]);
+      items.push({ ...box(pdf.map(([x, y]) => pg.vp1.convertToViewportPoint(x, y))),   // toạ độ hiển thị
+        grp: box(pdf.map(([x, y]) => vp0.convertToViewportPoint(x, y))),              // toạ độ để gộp dòng
+        text: it.str });
     }
-    items.sort((a, b) => a.y - b.y || a.x - b.x);
+    items.sort((a, b) => a.grp.y - b.grp.y || a.grp.x - b.grp.x);
     for (const it of items) {
-      const line = pg.lines.find(l => it.y < l.y + l.h + 2 && it.y + it.h > l.y - 2);
+      const line = pg.lines.find(l => it.grp.y < l.grp.y + l.grp.h + 2 && it.grp.y + it.grp.h > l.grp.y - 2);
       if (line) {
-        const x0 = Math.min(line.x, it.x), x1 = Math.max(line.x + line.w, it.x + it.w);
-        line.x = x0; line.w = x1 - x0;
-        const y0 = Math.min(line.y, it.y), y1 = Math.max(line.y + line.h, it.y + it.h);
-        line.y = y0; line.h = y1 - y0; line.text += ' ' + it.text;
-      } else pg.lines.push({ ...it });
+        const ux0 = Math.min(line.x, it.x), ux1 = Math.max(line.x + line.w, it.x + it.w);
+        const uy0 = Math.min(line.y, it.y), uy1 = Math.max(line.y + line.h, it.y + it.h);
+        line.x = ux0; line.w = ux1 - ux0; line.y = uy0; line.h = uy1 - uy0;
+        const gx0 = Math.min(line.grp.x, it.grp.x), gx1 = Math.max(line.grp.x + line.grp.w, it.grp.x + it.grp.w);
+        const gy0 = Math.min(line.grp.y, it.grp.y), gy1 = Math.max(line.grp.y + line.grp.h, it.grp.y + it.grp.h);
+        line.grp.x = gx0; line.grp.w = gx1 - gx0; line.grp.y = gy0; line.grp.h = gy1 - gy0;
+        line.text += ' ' + it.text;
+      } else pg.lines.push({ x: it.x, y: it.y, w: it.w, h: it.h, grp: { ...it.grp }, text: it.str });
     }
   } catch { /* PDF scan: không có lớp chữ để bám */ }
   return pg.lines;
 }
-/** Nới khung che cho phủ đúng các dòng chữ giao với nó. */
+/** Nới khung che cho phủ đúng các dòng chữ giao với nó.
+ *  Bề dày dòng (vuông góc với chiều chữ) LUÔN được nới cho đủ; chiều chạy của chữ chỉ
+ *  nới khi khung đã phủ hơn nửa dòng. Với trang xoay 90/270 chữ chạy dọc nên hai trục
+ *  đổi vai cho nhau — suy ra từ hình dạng hộp bao của dòng. */
 function snapRectToLines(lines, r) {
   const hit = lines.filter(l => l.y < r.y + r.h && l.y + l.h > r.y && l.x < r.x + r.w && l.x + l.w > r.x);
   if (!hit.length) return r;
-  const top = Math.min(...hit.map(l => l.y)) - 2, bot = Math.max(...hit.map(l => l.y + l.h)) + 2;
-  let x0 = r.x, x1 = r.x + r.w;
-  // khung đã phủ phần lớn bề ngang dòng thì kéo dài cho hết dòng
-  const full = hit.filter(l => (Math.min(x1, l.x + l.w) - Math.max(x0, l.x)) > l.w * 0.5);
-  if (full.length) { x0 = Math.min(x0, ...full.map(l => l.x)); x1 = Math.max(x1, ...full.map(l => l.x + l.w)); }
-  return { x: x0 - 2, y: top, w: (x1 - x0) + 4, h: bot - top };
+  const PAD = 2;
+  if (hit.every(l => l.w >= l.h)) {          // chữ nằm ngang: dày theo y, dài theo x
+    const top = Math.min(...hit.map(l => l.y)) - PAD, bot = Math.max(...hit.map(l => l.y + l.h)) + PAD;
+    let x0 = r.x, x1 = r.x + r.w;
+    const full = hit.filter(l => (Math.min(x1, l.x + l.w) - Math.max(x0, l.x)) > l.w * 0.5);
+    if (full.length) { x0 = Math.min(x0, ...full.map(l => l.x)); x1 = Math.max(x1, ...full.map(l => l.x + l.w)); }
+    return { x: x0 - PAD, y: top, w: (x1 - x0) + 2 * PAD, h: bot - top };
+  }
+  // chữ chạy dọc: dày theo x, dài theo y
+  const left = Math.min(...hit.map(l => l.x)) - PAD, right = Math.max(...hit.map(l => l.x + l.w)) + PAD;
+  let y0 = r.y, y1 = r.y + r.h;
+  const full = hit.filter(l => (Math.min(y1, l.y + l.h) - Math.max(y0, l.y)) > l.h * 0.5);
+  if (full.length) { y0 = Math.min(y0, ...full.map(l => l.y)); y1 = Math.max(y1, ...full.map(l => l.y + l.h)); }
+  return { x: left, y: y0 - PAD, w: right - left, h: (y1 - y0) + 2 * PAD };
 }
 /** Dòng chữ nằm dưới một điểm (bấm là che luôn cả dòng). */
 function lineAt(lines, x, y) {

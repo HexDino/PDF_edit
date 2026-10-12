@@ -17,6 +17,7 @@
     "test:erase": "node test/erase.mjs",
     "test:editing": "node test/editing.mjs",
     "test:session": "node test/session.mjs",
+    "test:rotation": "node test/rotation.mjs",
     "test:fonts": "node test/fonts-coverage.mjs && node test/fonts-export.mjs",
     "fonts:fetch": "node test/fonts-fetch.mjs"
   },
