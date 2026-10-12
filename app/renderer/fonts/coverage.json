@@ -1,9 +1,14 @@
 {
-  "generatedAt": "2026-10-12T03:53:15.403Z",
+  "generatedAt": "2026-10-12T04:21:24.847Z",
   "total": 146,
   "probe": "aáàảãạăắằẳẵặâấầẩẫậeéèẻẽẹêếềểễệiíìỉĩịoóòỏõọôốồổỗộơớờởỡợuúùủũụưứừửữựyýỳỷỹỵđAÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬEÉÈẺẼẸÊẾỀỂỄỆIÍÌỈĨỊOÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢUÚÙỦŨỤƯỨỪỬỮỰYÝỲỶỸỴĐ",
   "fonts": {
     "AlexBrush-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "Allura-Regular.ttf": {
       "coverage": 1,
       "missing": "",
       "error": null
@@ -23,6 +28,11 @@
       "missing": "",
       "error": null
     },
+    "ComforterBrush-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
     "DancingScript.ttf": {
       "coverage": 1,
       "missing": "",
@@ -38,6 +48,31 @@
       "missing": "",
       "error": null
     },
+    "IBMPlexMono-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "Italianno-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "Itim-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "JetBrainsMono.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "Lora.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
     "Mali-Regular.ttf": {
       "coverage": 1,
       "missing": "",
@@ -48,12 +83,32 @@
       "missing": "",
       "error": null
     },
+    "MeowScript-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
     "Ole-Regular.ttf": {
       "coverage": 1,
       "missing": "",
       "error": null
     },
+    "Pangolin-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
     "PatrickHand-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "PinyonScript-Regular.ttf": {
+      "coverage": 1,
+      "missing": "",
+      "error": null
+    },
+    "PlayfairDisplay.ttf": {
       "coverage": 1,
       "missing": "",
       "error": null
