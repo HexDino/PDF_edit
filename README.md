@@ -2,8 +2,6 @@
 
 Ứng dụng desktop **Electron** (giao diện tiếng Việt) để chỉnh sửa PDF thường và PDF scan: thêm chữ viết tay, tẩy/che nội dung (khung, cọ xoá, khoanh vùng), bút/bút dạ quang, chữ ký vẽ hoặc nhập ảnh, xem thumbnail trang. Chạy **ngoại tuyến** — thư viện PDF và phông chữ được đóng gói sẵn trong app.
 
-Phiên bản trình duyệt một file (CDN) nằm ở [`web/index.html`](web/index.html) — có thêm chữ viết tay và **công cụ tẩy/che** (khung, cọ xoá, khoanh vùng, bám dòng chữ, xoá hẳn); chưa có bút/dạ quang, chèn ảnh và chữ ký.
-
 ![Công cụ tẩy/che trên PDF](docs/screenshot-erase-tool.png)
 
 ![Đặt chữ ký lên trang](docs/screenshot-signature-placed.png)
@@ -24,7 +22,6 @@ Phiên bản trình duyệt một file (CDN) nằm ở [`web/index.html`](web/in
 
 ```
 app/          # Ứng dụng Electron (main.js, preload.js, renderer/, build/, test/)
-web/          # Bản web một file (index.html)
 docs/         # Ảnh minh họa cho README
 ```
 
@@ -94,13 +91,6 @@ cd ../..
   npm run test:erase
   ```
 
-- **Bản web** (`web/index.html`): dựng một máy chủ tĩnh nhỏ rồi chạy các thao tác
-  tẩy/xoá và lưu PDF thật trên trang. Cần **Internet** vì bản web tải pdf.js/pdf-lib/fontkit từ CDN.
-
-  ```bash
-  npm run test:web
-  ```
-
 - **Phông chữ**: kiểm tra độ phủ 146 ký tự tiếng Việt của mọi file trong
   `renderer/fonts/`, và nhúng thử tất cả phông vào PDF:
 
@@ -132,8 +122,6 @@ Các phông viết tay, phông chữ in và **Be Vietnam Pro** lấy từ [Googl
   Chọn **PNG** để giữ nét tối đa hoặc giảm **dpi** để file nhẹ hơn.
 - **Không xoay trang** PDF.
 - **Không hỗ trợ** PDF có mật khẩu / mã hóa.
-- Bản web ([`web/index.html`](web/index.html)) mới có: mở PDF, thêm chữ viết tay, tẩy/che (khung, cọ xoá, khoanh vùng) và lưu —
-  **chưa có** bút, dạ quang, chèn ảnh, chữ ký và thumbnail trang.
 
 ## Tác giả
 

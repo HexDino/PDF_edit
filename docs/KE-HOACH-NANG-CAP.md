@@ -1,7 +1,11 @@
 # Kế hoạch nâng cấp — Trình sửa PDF
 
 **Ngày lập:** 2026-10-12 · **Nhánh đề xuất:** `feature/fonts-erase-signature`
-**Phạm vi:** cả app Electron (`app/`) và bản web một file (`web/index.html`).
+**Phạm vi:** app Electron (`app/`).
+
+> **Cập nhật 2026-10-12:** ban đầu kế hoạch gồm cả bản web một file (`web/index.html`).
+> Bản web **đã được bỏ** theo yêu cầu — dự án chỉ còn bản desktop Electron. Các mục
+> 1.4, 5.5, 6.6 và Giai đoạn 4 dưới đây chỉ còn giá trị tham khảo lịch sử.
 
 Mục tiêu: (1) đa dạng hoá font chữ, (2) nâng cấp công cụ tẩy/xoá, (3) sửa các lỗi phần chữ ký.
 
@@ -41,7 +45,7 @@ Mục tiêu: (1) đa dạng hoá font chữ, (2) nâng cấp công cụ tẩy/xo
 | S7 | `imgStore` không dọn khi mở file mới | `openBytes` L121–155 | Rò rỉ bộ nhớ khi mở nhiều file |
 
 ### 1.4 Bản web
-Bản web (`web/index.html`, 639 dòng) dùng pdf.js v4.10.38 + pdf-lib + fontkit qua CDN. **Hiện chỉ có: mở PDF, thêm chữ, tẩy hình chữ nhật, lưu.** **Không có** bút, dạ quang, chèn ảnh, chữ ký, thumbnail. → Đồng bộ toàn bộ là khối lượng lớn; xem mục 6.
+~~Bản web (`web/index.html`) dùng pdf.js + pdf-lib + fontkit qua CDN.~~ **Đã bỏ bản web** — không còn trong repo.
 
 ---
 
@@ -119,7 +123,7 @@ Làm trước vì sửa được lỗi thật, ít đụng chạm kiến trúc.
 - Thêm test so sánh dung lượng PDF trước/sau với cùng nội dung.
 
 ### 5.5 Bản web
-- Cập nhật `FONTS` trong `web/index.html` (L187–205) với `gf` name mới; thêm nhóm; đồng bộ UI tìm kiếm/ghim.
+~~Cập nhật `FONTS` trong `web/index.html` với `gf` name mới; thêm nhóm; đồng bộ UI tìm kiếm/ghim.~~ **Đã bỏ bản web.**
 
 **Nghiệm thu:** mọi font mới qua coverage test; xuất PDF nhiều font → dung lượng giảm rõ rệt; UI chọn font có tìm kiếm + ghim + cảnh báo thiếu dấu.
 
@@ -158,21 +162,21 @@ Thêm `fillMode` cho mỗi mask: `'color' | 'gradient' | 'clone'` (mặc định
 - Thêm nút **"Xem trước kết quả"** (rasterize thử trang đầu có mask và hiển thị).
 
 ### 6.6 Bản web
-- Đồng bộ: cọ xoá + lasso, snap dòng chữ (pdf.js có sẵn), `fillMode` gradient/clone, tuỳ chọn chất lượng khi lưu.
+- ~~Đồng bộ cọ xoá + lasso, snap dòng chữ, tuỳ chọn chất lượng khi lưu~~ — **đã bỏ bản web.**
 
 **Nghiệm thu:** mở rộng `test/overlay.mjs` với mask brush/lasso/snap; xuất PNG vs JPEG và so dung lượng; kiểm tra PDF xoay 90/180/270 vẫn che đúng vị trí.
 
 ---
 
-## 7. Giai đoạn 4 — Đồng bộ web & hoàn thiện
+## 7. Giai đoạn 4 — Hoàn thiện
 
-> ⚠️ **Điểm cần quyết định:** bản web hiện **không có** chữ ký/bút/dạ quang/ảnh/thumbnail. Port **toàn bộ** sang web là khối lượng ngang một tính năng lớn. Đề xuất thứ tự: (a) font → (b) tẩy/xoá → (c) *tuỳ chọn* dựng module chữ ký cho web ở giai đoạn riêng.
+> Bản web **đã bỏ**; các việc đồng bộ web không còn thực hiện.
 
-- [ ] Đồng bộ font + tẩy/xoá sang `web/index.html`.
-- [ ] Cập nhật `README.md`: số font, nhóm font, tính năng tẩy/xoá mới, hạn chế mới, giấy phép font mới.
+- [x] Cập nhật `README.md` (29 phông, nhóm font, tính năng tẩy/xoá mới, hạn chế, giấy phép font mới, hướng dẫn test).
+- [x] Bump `version` lên 1.1.0; `npm run build` cho Windows x64 (portable + NSIS) — đã kiểm tra bản đóng gói chạy được.
+- [x] Chạy full test trên Windows (8 bộ đều đạt).
 - [ ] Cập nhật ảnh `docs/` (bộ chọn font mới, cọ xoá, snap dòng, hộp thoại lưu mới).
-- [ ] Bump `version` trong `app/package.json`; kiểm tra `npm run build` (Windows x64).
-- [ ] Chạy full test trên Windows; nếu cần, chạy thêm trên Linux/xvfb.
+- [ ] Hộp thoại **xem trước** kết quả trước khi lưu.
 
 ---
 
@@ -196,6 +200,6 @@ Thêm `fillMode` cho mỗi mask: `'color' | 'gradient' | 'clone'` (mặc định
 2. **Giai đoạn 1** — sửa 8 lỗi chữ ký (giá trị cao nhất, rủi ro thấp nhất).
 3. **Giai đoạn 2** — font: bổ sung + nhóm + UI + subset.
 4. **Giai đoạn 3** — tẩy/xoá: brush/lasso, snap dòng, nền gradient, chất lượng flatten.
-5. **Giai đoạn 4** — đồng bộ web, README, ảnh, build.
+5. **Giai đoạn 4** — README, ảnh `docs/`, build (bản web đã bỏ).
 
 Sau mỗi giai đoạn: chạy test + demo thủ công để bạn nghiệm thu trước khi sang bước tiếp theo.

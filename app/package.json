@@ -15,7 +15,6 @@
     "test:overlay": "node test/overlay.mjs",
     "test:signature": "node test/signature.mjs",
     "test:erase": "node test/erase.mjs",
-    "test:web": "node test/web-erase.mjs",
     "test:fonts": "node test/fonts-coverage.mjs && node test/fonts-export.mjs",
     "fonts:fetch": "node test/fonts-fetch.mjs"
   },
