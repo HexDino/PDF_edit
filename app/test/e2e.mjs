@@ -29,7 +29,14 @@ async function saveVia(path, trueRemove){
 }
 
 /* ---------- 1. PDF scan: tẩy xóa + chữ thay thế + chữ ký vẽ + ảnh chữ ký tách nền ---------- */
-await openPdf(testFile('scan-test.pdf'));
+// Dùng BẢN SAO trong test/out: khi lưu, app ghi kèm file phiên .tsp.json cạnh PDF gốc,
+// nên mở thẳng file mẫu trong repo sẽ làm bẩn thư mục test/.
+const SCAN = path.join(OUT, 'e2e-scan.pdf'), TEXT = path.join(OUT, 'e2e-text.pdf');
+for (const [src, dst] of [['scan-test.pdf', SCAN], ['text-doc.pdf', TEXT]]) {
+  fs.copyFileSync(testFile(src), dst);
+  if (fs.existsSync(dst.replace(/\.pdf$/i, '') + '.tsp.json')) fs.unlinkSync(dst.replace(/\.pdf$/i, '') + '.tsp.json');
+}
+await openPdf(SCAN);
 await w.click('[data-tool="erase"]');
 await dragRect(0, 140, 196, 330, 214);         // che dòng chấm "Họ và tên: ....."
 let o = await objs(); console.log('rect after draw:', JSON.stringify(o[0]));
@@ -72,7 +79,7 @@ catch { console.log('signature library files: (thư mục chưa tồn tại)'); 
 
 /* ---------- 2. PDF chữ thường: tẩy xóa số tài khoản, xóa hẳn ---------- */
 await setSave(path.join(OUT, '_tmp-save.pdf')); await app.evaluate(({dialog})=>{}); await A(()=>{window.confirm=()=>true;});
-await openPdf(testFile('text-doc.pdf'));
+await openPdf(TEXT);
 await w.click('[data-tool="erase"]');
 await dragRect(0, 196, 176, 290, 198);
 o = await objs(); console.log('text-pdf rect:', JSON.stringify(o[0]));

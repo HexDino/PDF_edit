@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   sigList: () => ipcRenderer.invoke('sig-list'),
   sigSave: d => ipcRenderer.invoke('sig-save', d),
   sigDelete: id => ipcRenderer.invoke('sig-delete', id),
+  sessionRead: p => ipcRenderer.invoke('session-read', p),
+  sessionWrite: (p, d) => ipcRenderer.invoke('session-write', p, d),
+  sessionDelete: p => ipcRenderer.invoke('session-delete', p),
 });

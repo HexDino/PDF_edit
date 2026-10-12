@@ -30,6 +30,9 @@ Thumbs.db
 # Thư mục tải phông ứng viên để kiểm tra trước khi thêm
 app/test/fonts-candidates*/
 
+# File phiên chỉnh sửa sinh ra khi chạy test (app ghi cạnh PDF gốc)
+app/test/*.tsp.json
+
 # Playwright (if added later)
 playwright-report/
 test-results/

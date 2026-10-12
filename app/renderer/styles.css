@@ -36,6 +36,8 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 .chk.big{font-size:14px;margin:10px 0}
 #zoomLbl{min-width:46px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums}
 .status{margin-left:auto;font-size:12.5px;color:var(--mut);display:flex;align-items:center;gap:6px;max-width:340px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#sessionTag{color:#0b5cd5;cursor:help}
+#sessionTag[hidden]{display:none}
 .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;flex:none}.dot.ok{background:#10b981}.dot.err{background:#ef4444}
 /* font picker */
 .fp{position:relative}

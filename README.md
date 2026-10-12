@@ -15,6 +15,7 @@
   - **Nền che** chọn được: một màu, **chuyển sắc theo nền**, hoặc **sao chép dải nền phía trên**; thêm tuỳ chọn **mờ mép** cho khỏi lộ đường viền. Có nút tự lấy màu và ống hút.
   - Tùy chọn **xóa hẳn** khi lưu: chọn **định dạng ảnh (tự động / PNG / JPEG)**, **độ phân giải (150–600 dpi)** và chất lượng JPEG.
 - **Chữ ký**: vẽ trên pad, nhập ảnh (tách nền tự động theo Otsu, tự cắt sát, làm đậm/mảnh nét), thư viện chống trùng lặp. **Đặt nhanh vào góc trang** (dưới trái / giữa dưới / dưới phải) và tuỳ chọn **đặt lên tất cả các trang**. Thư viện lưu tại `%APPDATA%\TrinhSuaPDF\signatures` (Windows) hoặc tương đương trên Linux/macOS.
+- **Phiên chỉnh sửa**: mỗi lần lưu, app ghi kèm một file `‹tên gốc›.tsp.json` cạnh PDF gốc, giữ lại toàn bộ đối tượng đã thêm/sửa (chữ, chữ ký, vùng che, bút, dạ quang) và cả những trang đã xoá. Lần sau mở lại **file gốc** là mọi thứ hiện về và chỉnh tiếp được — vì PDF đã xuất là bản "nướng", không sửa lại được nữa. Có nút **🗂 Lưu phiên** và **Xoá phiên**; thanh trạng thái hiện `· phiên: …`. Phiên của tài liệu khác (khác số trang/kích thước) sẽ tự bị bỏ qua để không dán nhầm chữ ký sang văn bản khác.
 - **Tiện ích soạn thảo**: hoàn tác / **làm lại** (Ctrl+Z · Ctrl+Y), **nhân bản đối tượng** (Ctrl+D hoặc nút ⧉ trên đối tượng), xoá đối tượng, phím tắt chọn công cụ (V/T/E/P/H).
 - Bút, bút dạ quang; xuất PDF qua pdf-lib + fontkit, nhúng phông theo **subset** để file nhẹ.
 - Đóng gói Windows x64: file **portable** và **NSIS installer** (electron-builder).
@@ -92,6 +93,12 @@ cd ../..
   npm run test:erase
   ```
 
+- **Phiên chỉnh sửa** (lưu kèm, mở lại là khôi phục, chống dán nhầm sang file khác):
+
+  ```bash
+  npm run test:session
+  ```
+
 - **Tiện ích soạn thảo** (làm lại, nhân bản đối tượng, đặt nhanh chữ ký vào góc trang):
 
   ```bash
@@ -129,6 +136,7 @@ Các phông viết tay, phông chữ in và **Be Vietnam Pro** lấy từ [Googl
   Chọn **PNG** để giữ nét tối đa hoặc giảm **dpi** để file nhẹ hơn.
 - **Không xoay trang** PDF.
 - **Không hỗ trợ** PDF có mật khẩu / mã hóa.
+- File phiên `‹tên›.tsp.json` nằm cạnh PDF gốc và chứa **nội dung bạn đã thêm** (chữ thay thế, chữ ký, vị trí các vùng che). Nó **không** chứa nội dung gốc bị che, nhưng vẫn cho thấy bạn đã sửa ở đâu — nên khi gửi PDF cho người khác thì đừng gửi kèm file này.
 
 ## Tác giả
 

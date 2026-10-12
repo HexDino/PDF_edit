@@ -216,10 +216,10 @@ Làm theo đề xuất, chọn nhóm rủi ro thấp nhưng dùng hằng ngày:
 
 Test: `npm run test:editing` (12/12).
 
-### Đề xuất tiếp theo (chưa làm)
+### Đề xuất tiếp theo
 | # | Việc | Vì sao |
 |---|---|---|
-| 1 | Lưu/đọc lại **phiên chỉnh sửa** (sidecar `.tsp.json`) | Hiện lưu là một chiều, mở lại không sửa được nữa |
+| ~~1~~ | ~~Lưu/đọc lại **phiên chỉnh sửa** (sidecar `.tsp.json`)~~ — **đã làm** | Lưu kèm cạnh PDF gốc; mở lại file gốc là khôi phục; chống dán nhầm bằng số trang + kích thước file. Test `npm run test:session` (14/14). |
 | 2 | **Xoay trang** + sắp xếp lại / thêm trang trắng / nhân bản trang | README đang ghi "không xoay trang"; scan lệch rất thường |
 | 3 | Hộp thoại **xem trước** trước khi lưu | Nhất là với "xoá hẳn": thấy trước kết quả và dung lượng |
 | 4 | **Bắt dòng kẻ chấm** để căn chữ khi điền biểu mẫu | Biểu mẫu Việt hay có "Họ và tên: ......" |

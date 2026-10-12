@@ -16,6 +16,8 @@
       <button id="openBtn" class="primary" title="Mở file PDF (Ctrl+O)">📂 Mở</button>
       <button id="saveBtn" title="Lưu (Ctrl+S)" disabled>💾 Lưu</button>
       <button id="saveAsBtn" title="Lưu thành file khác (Ctrl+Shift+S)" disabled>Lưu thành…</button>
+      <button id="saveSessionBtn" title="Lưu phiên chỉnh sửa cạnh file gốc để lần sau mở lại sửa tiếp" disabled>🗂 Lưu phiên</button>
+      <button id="clearSessionBtn" title="Xoá phiên chỉnh sửa của file này" disabled>Xoá phiên</button>
     </div>
     <div class="grp">
       <button id="zoomOut" class="icon" title="Thu nhỏ (Ctrl −)">−</button>
@@ -37,7 +39,7 @@
       <button id="redoBtn" title="Làm lại (Ctrl+Y)" disabled>↷ Làm lại</button>
       <button id="delBtn" title="Xóa đối tượng đang chọn (Delete)" disabled>🗑 Xóa</button>
     </div>
-    <div class="status"><span class="dot ok" id="dot"></span><span id="status">Sẵn sàng</span></div>
+    <div class="status"><span class="dot ok" id="dot"></span><span id="status">Sẵn sàng</span><span id="sessionTag" hidden></span></div>
   </div>
   <div class="ctx">
     <!-- Chữ -->

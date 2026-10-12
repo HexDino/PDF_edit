@@ -17,9 +17,16 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
 };
 
+// Mở bản sao trong test/out: nếu mở thẳng file mẫu trong repo, một file phiên .tsp.json
+// còn sót lại sẽ được khôi phục và làm test bắt đầu với dữ liệu lạ.
+const WORK = path.join(OUT, 'editing-text.pdf');
+const SIDE = WORK.replace(/\.pdf$/i, '') + '.tsp.json';
+fs.copyFileSync(testFile('text-doc.pdf'), WORK);
+if (fs.existsSync(SIDE)) fs.unlinkSync(SIDE);
+
 const app = await electron.launch({
   executablePath: electronBin,
-  args: [APP_ROOT, '--no-sandbox', testFile('text-doc.pdf')],
+  args: [APP_ROOT, '--no-sandbox', WORK],
   env: electronEnv,
 });
 const w = await app.firstWindow();

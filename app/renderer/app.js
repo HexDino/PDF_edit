@@ -82,7 +82,11 @@ const history = [], future = [];   // future: ngăn xếp cho "làm lại" (Ctrl
 function toast(msg, ms = 2800) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
 function busy(on, txt) { $('busy').classList.toggle('show', on); if (txt) $('busyTxt').textContent = txt; }
 function status(txt, st = 'ok') { $('status').textContent = txt; $('dot').className = 'dot ' + st; }
-function setDirty(d) { dirty = d; API?.setDirty(d); document.title = (d ? '• ' : '') + (pdfDoc ? origName + ' – ' : '') + 'Trình sửa PDF'; }
+function setDirty(d) {
+  dirty = d; API?.setDirty(d);
+  document.title = (d ? '• ' : '') + (pdfDoc ? origName + ' – ' : '') + 'Trình sửa PDF';
+  if (d && origPath) sessionTag('dirty');
+}
 
 /* ======================= Ma trận 2D (dạng PDF [a b c d e f]) ======================= */
 const mul = (A, B) => [A[0]*B[0] + A[2]*B[1], A[1]*B[0] + A[3]*B[1], A[0]*B[2] + A[2]*B[3], A[1]*B[2] + A[3]*B[3], A[0]*B[4] + A[2]*B[5] + A[4], A[1]*B[4] + A[3]*B[5] + A[5]];
@@ -217,8 +221,16 @@ async function openBytes(bytes, name, path) {
     }
     fitWidth(true); updateButtons(); setDirty(false);
     status(`${origName} · ${doc.numPages} trang`);
-    toast(`Đã mở ${doc.numPages} trang`);
     renderThumbs();
+    // Khôi phục phiên chỉnh sửa đã lưu cạnh file gốc (nếu có)
+    const restored = await loadSession();
+    if (restored > 0) {
+      status(`${origName} · ${doc.numPages} trang · đã khôi phục ${restored} đối tượng`, 'ok');
+      toast(`Đã khôi phục phiên chỉnh sửa: ${restored} đối tượng`, 5000);
+    } else {
+      sessionTag(origPath ? 'none' : 'none');
+      toast(`Đã mở ${doc.numPages} trang`);
+    }
   } catch (e) { console.error(e); toast('Không mở được file: ' + (e.message || e), 6000); status('Lỗi mở file', 'err'); }
   finally { busy(false); }
 }
@@ -443,6 +455,7 @@ function updateButtons() {
   $('redoBtn').disabled = !future.length;
   $('delBtn').disabled = !selected;
   $('saveBtn').disabled = $('saveAsBtn').disabled = !pdfDoc;
+  $('saveSessionBtn').disabled = $('clearSessionBtn').disabled = !pdfDoc || !API || !origPath;
 }
 
 /* ======================= Đối tượng trên trang ======================= */
@@ -1439,15 +1452,94 @@ async function doSave(saveAs, trueRemove) {
       setTimeout(() => URL.revokeObjectURL(url), 60000); where = saveName();
     }
     setDirty(false);
+    // Lưu kèm phiên để mở lại file gốc là sửa tiếp được (PDF đã xuất thì không sửa lại được)
+    const sessionOk = await saveSession(true);
     const miss = Object.entries(missing).map(([k, set]) => `${fontByKey(k).name}: ${[...set].join(' ')}`);
-    const msg = `Đã lưu “${where.split(/[\\/]/).pop()}”` + (flattened ? ` · đã xóa hẳn nội dung bị che trên ${flattened} trang (ảnh ${Math.round(flatBytes / 1024)} KB)` : '') + (miss.length ? ` · Lưu ý, phông không có ký tự → ${miss.join('; ')}` : '');
-    toast(msg, 6000); status(msg);
+    const msg = `Đã lưu “${where.split(/[\\/]/).pop()}”` + (sessionOk ? ` · kèm phiên chỉnh sửa ‹${origName.replace(/\.pdf$/i, '')}.tsp.json›` : '') + (flattened ? ` · đã xóa hẳn nội dung bị che trên ${flattened} trang (ảnh ${Math.round(flatBytes / 1024)} KB)` : '') + (miss.length ? ` · Lưu ý, phông không có ký tự → ${miss.join('; ')}` : '');
+    toast(msg, 7000); status(msg);
     return where;
   } catch (e) { console.error(e); toast('Lỗi khi lưu PDF: ' + (e.message || e), 7000); status('Lỗi khi lưu', 'err'); }
   finally { busy(false); }
 }
 $('saveBtn').onclick = () => save(false);
 $('saveAsBtn').onclick = () => save(true);
+
+/* ======================= Phiên chỉnh sửa (.tsp.json) ======================= */
+/** File PDF đã lưu là bản "nướng" — không sửa lại được. Phiên lưu các đối tượng đã
+ *  thêm/sửa vào một file JSON cạnh PDF gốc, để mở lại file gốc là chỉnh tiếp. */
+function buildSession() {
+  const used = new Set(objects.filter(o => o.type === 'img').map(o => o.srcId));
+  const imgs = {};
+  for (const k of used) if (imgStore[k]) imgs[k] = imgStore[k];
+  return {
+    app: 'TrinhSuaPDF', version: 1, savedAt: new Date().toISOString(),
+    pdf: { name: origName, size: origBytes ? origBytes.length : 0, pages: pages.length },
+    deleted: pages.map(p => !!p.deleted),
+    imgs, objects: objects.map(plain),
+  };
+}
+/** Khôi phục chỉnh sửa từ phiên. Trả về số đối tượng, -1 nếu phiên không dùng được. */
+function applySession(s) {
+  if (!s || !Array.isArray(s.objects) || !Array.isArray(s.deleted)) return -1;
+  // Phiên của tài liệu khác thì bỏ qua — tránh dán nhầm chữ ký sang văn bản khác
+  if (s.pdf) {
+    if (s.pdf.pages && s.pdf.pages !== pages.length) return -1;
+    if (s.pdf.size && origBytes && s.pdf.size !== origBytes.length) return -1;
+  }
+  objects.forEach(o => o.el?.remove()); objects = []; selected = null;
+  for (const k in imgStore) delete imgStore[k];
+  srcSeq = 1;
+  for (const [k, v] of Object.entries(s.imgs || {})) {
+    imgStore[k] = v;
+    const m = /^s(\d+)-/.exec(k); if (m) srcSeq = Math.max(srcSeq, +m[1] + 1);
+  }
+  pages.forEach((p, i) => p.deleted = !!s.deleted[i]);
+  objects = s.objects.map(d => createObj(d));
+  for (const o of objects) nextId = Math.max(nextId, o.id + 1);
+  objects.forEach(layout);
+  refreshDeleted(); updateButtons(); syncControls();
+  return objects.length;
+}
+/** Ghi phiên cạnh file PDF gốc. */
+async function saveSession(quiet) {
+  if (!API || !origPath) { if (!quiet) toast('Chưa biết file gốc nên không lưu được phiên'); return false; }
+  try {
+    await API.sessionWrite(origPath, buildSession());
+    sessionTag('saved');
+    if (!quiet) toast('Đã lưu phiên cạnh file gốc — mở lại file gốc là sửa tiếp được', 5000);
+    return true;
+  } catch (e) { console.warn(e); if (!quiet) toast('Không ghi được phiên: ' + (e.message || e)); return false; }
+}
+/** Đọc phiên cạnh file gốc (nếu có) và dựng lại chỉnh sửa. */
+async function loadSession() {
+  if (!API || !origPath) return -1;
+  try {
+    const s = await API.sessionRead(origPath);
+    if (!s) return -1;
+    const n = applySession(s);
+    if (n < 0) { toast('Có file phiên nhưng không khớp với PDF này nên bỏ qua', 6000); return -1; }
+    sessionTag('restored', s.savedAt);
+    return n;
+  } catch (e) { console.warn(e); return -1; }
+}
+async function clearSession() {
+  if (!API || !origPath) return;
+  if (!confirm('Xoá phiên chỉnh sửa của file này?\n\nCác đối tượng đang có trên trang vẫn giữ nguyên, nhưng lần sau mở lại sẽ không tự khôi phục nữa.')) return;
+  await API.sessionDelete(origPath);
+  setDirty(false); sessionTag('none');
+  toast('Đã xoá phiên chỉnh sửa');
+}
+function sessionTag(state, when) {
+  const el = $('sessionTag'); if (!el) return;
+  el.hidden = state === 'none' || !origPath;
+  el.textContent = state === 'saved' ? '· phiên: đã lưu'
+    : state === 'dirty' ? '· phiên: có thay đổi chưa lưu'
+      : '· phiên: đã khôi phục';
+  el.title = when ? 'Lưu lúc ' + new Date(when).toLocaleString('vi-VN')
+    : 'Chỉnh sửa được lưu cạnh file PDF gốc dạng .tsp.json';
+}
+$('saveSessionBtn').onclick = () => saveSession(false);
+$('clearSessionBtn').onclick = () => clearSession();
 
 /* ======================= Phím tắt ======================= */
 window.addEventListener('keydown', e => {
@@ -1485,6 +1577,7 @@ window.__app = { openBytes, createObj, save, doSave, buildPdf, setTool, chooseFo
   FONTS, loadFont, fontBytes, charSetFor, pdfjs: pdfjsLib,
   pageLines, snapRectToLines, lineAt, maskBox, maskPatch, paintMask, renderMaskedPage, pickAutoFormat, syncFlatOpts,
   redo, undo, restoreState, duplicateObj, placeSignatureAt, sigSize, currentPageIdx, prepareSrc, pushHistory,
+  saveSession, loadSession, clearSession, applySession, buildSession,
   get future() { return future; },
   get libSel() { return libSel; }, setLibSel: v => { libSel = v; },
   get sigSrcImg() { return sigSrcImg; }, setSigSrcImg: v => { sigSrcImg = v; } };

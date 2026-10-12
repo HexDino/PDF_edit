@@ -99,3 +99,23 @@ ipcMain.handle('sig-save', (_e, dataUrl) => {
   return id;
 });
 ipcMain.handle('sig-delete', (_e, id) => { const f = path.join(sigDir(), path.basename(id) + '.png'); if (fs.existsSync(f)) fs.unlinkSync(f); });
+
+// Phiên chỉnh sửa: file phụ "<tên>.tsp.json" nằm cạnh PDF gốc, giữ lại các đối tượng đã
+// thêm/sửa để lần sau mở lại vẫn chỉnh tiếp được (PDF đã lưu là bản "nướng", không sửa lại được).
+const sessionPathOf = p => (typeof p === 'string' && p ? p.replace(/\.pdf$/i, '') + '.tsp.json' : null);
+ipcMain.handle('session-read', (_e, pdfPath) => {
+  const f = sessionPathOf(pdfPath);
+  if (!f || !fs.existsSync(f)) return null;
+  try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; }
+});
+ipcMain.handle('session-write', (_e, pdfPath, data) => {
+  const f = sessionPathOf(pdfPath);
+  if (!f) return null;
+  fs.writeFileSync(f, JSON.stringify(data));
+  return f;
+});
+ipcMain.handle('session-delete', (_e, pdfPath) => {
+  const f = sessionPathOf(pdfPath);
+  if (f && fs.existsSync(f)) fs.unlinkSync(f);
+  return f;
+});
