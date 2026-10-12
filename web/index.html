@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chỉnh sửa PDF – Chữ viết tay</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap&subset=vietnamese" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<style>
+  :root{
+    --blue:#0b5cd5; --blue-d:#0a47a6; --ink:#1a2a7a; --bg:#e9edf3; --line:#d7dde6; --txt:#1f2937; --mut:#6b7280;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:"Be Vietnam Pro",system-ui,"Segoe UI",Arial,sans-serif;color:var(--txt);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+  header{background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 6px rgba(15,23,42,.06);z-index:20}
+  .bar{display:flex;align-items:center;gap:10px;padding:8px 14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin-right:6px;white-space:nowrap}
+  .brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#0b5cd5,#3b82f6);display:grid;place-items:center;color:#fff;font-size:17px}
+  .grp{display:flex;align-items:center;gap:6px;padding:0 10px;border-left:1px solid var(--line)}
+  .grp:first-of-type{border-left:0}
+  button,.btn{font:inherit;font-size:13.5px;border:1px solid var(--line);background:#fff;color:var(--txt);height:34px;padding:0 12px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:background .15s,border-color .15s}
+  button:hover:not(:disabled){background:#f3f6fb;border-color:#c3ccd9}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+  button.primary:hover:not(:disabled){background:var(--blue-d)}
+  button.icon{width:34px;padding:0;justify-content:center;font-size:17px}
+  button.on{background:#e6efff;border-color:var(--blue);color:var(--blue-d);font-weight:600}
+  select,input[type=number]{font:inherit;font-size:14px;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:#fff;color:var(--txt)}
+  /* Bộ chọn phông */
+  .fp{position:relative}
+  #fontBtn{min-width:210px;justify-content:space-between;font-size:18px}
+  #fontBtn .cv{font-family:"Be Vietnam Pro",sans-serif;font-size:11px;color:var(--mut)}
+  #fontPanel{position:absolute;top:40px;left:0;width:430px;max-height:min(70vh,620px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(15,23,42,.18);padding:6px;display:none;z-index:40}
+  #fontPanel.open{display:block}
+  .fg{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);padding:10px 10px 4px}
+  .fi{display:flex;align-items:center;gap:10px;width:100%;height:auto;min-height:46px;border:0;border-radius:8px;padding:4px 10px;background:transparent;text-align:left}
+  .fi:hover{background:#f1f5fd}
+  .fi.sel{background:#e6efff;box-shadow:inset 3px 0 0 var(--blue)}
+  .fi .nm{width:118px;flex:none;font-size:12px;color:var(--mut);white-space:normal;line-height:1.25}
+  .fi .pv{flex:1;font-size:23px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+  .fi .ld{font-size:11px;color:var(--blue)}
+  #slantIn{width:56px}
+  .chk{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--txt);cursor:pointer;white-space:nowrap}
+  input[type=number]{width:64px}
+  input[type=color]{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;padding:3px;background:#fff;cursor:pointer}
+  .sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
+  .sw.sel{box-shadow:0 0 0 2px var(--blue)}
+  .lbl{font-size:12.5px;color:var(--mut)}
+  #zoomLbl{min-width:48px;text-align:center;font-size:13.5px;font-variant-numeric:tabular-nums}
+  #fileName{font-size:13px;color:var(--mut);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .status{margin-left:auto;font-size:12.5px;color:var(--mut);display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b}
+  .dot.ok{background:#10b981}.dot.err{background:#ef4444}
+  main{flex:1;overflow:auto;position:relative}
+  #pages{display:flex;flex-direction:column;align-items:center;gap:22px;padding:28px 20px 80px;min-width:max-content}
+  .page{position:relative;background:#fff;box-shadow:0 2px 10px rgba(15,23,42,.15),0 0 0 1px rgba(15,23,42,.05)}
+  .page canvas{display:block}
+  .page .num{position:absolute;bottom:-19px;left:0;right:0;text-align:center;font-size:11.5px;color:var(--mut)}
+  .layer{position:absolute;inset:0}
+  body.mode-add .layer{cursor:text}
+  /* Empty state */
+  #empty{position:absolute;inset:0;display:grid;place-items:center;padding:20px}
+  .drop{width:min(560px,100%);background:#fff;border:2px dashed #b9c5d6;border-radius:18px;padding:44px 30px;text-align:center;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+  .drop h2{margin:10px 0 6px;font-size:21px}
+  .drop p{margin:0 0 20px;color:var(--mut);font-size:14px;line-height:1.55}
+  .drop .big{font-size:46px}
+  .drop .hand{font-size:30px;color:var(--ink);margin:4px 0 18px}
+  body.dragging .drop,body.dragging #pages{outline:3px dashed var(--blue);outline-offset:-10px}
+  /* Text boxes */
+  .tb{position:absolute;outline:1px dashed transparent;outline-offset:3px;border-radius:2px}
+  .tb:hover{outline-color:rgba(11,92,213,.45)}
+  .tb.sel{outline:1.5px dashed var(--blue)}
+  .tb textarea{display:block;margin:0;padding:0;border:0;outline:0;background:transparent;resize:none;overflow:hidden;white-space:pre;
+    font-kerning:none;font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0,"calt" 0,"dlig" 0;line-height:1.25;letter-spacing:0;tab-size:4;caret-color:var(--blue);color:transparent;-webkit-text-fill-color:transparent;position:relative;z-index:1}
+  .tb textarea::placeholder{color:rgba(26,42,122,.35);-webkit-text-fill-color:rgba(26,42,122,.35)}
+  .tb textarea::selection{background:rgba(11,92,213,.22)}
+  .tb .ln{position:absolute;left:0;margin:0;white-space:pre;pointer-events:none;font-kerning:none;font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0,"calt" 0,"dlig" 0;line-height:1.25}
+  body.mode-select .tb textarea{cursor:move}
+  .tb .tools{position:absolute;left:-4px;top:-34px;display:none;gap:4px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px;box-shadow:0 4px 12px rgba(15,23,42,.12);white-space:nowrap}
+  .tb.sel .tools{display:flex}
+  .tb .tools button{height:24px;width:26px;padding:0;justify-content:center;font-size:13px;border:0;border-radius:6px}
+  .tb .tools .mv{cursor:move}
+  .tb .tools .del:hover{background:#fee2e2;color:#b91c1c}
+  .tb .rs{position:absolute;right:-9px;bottom:-9px;width:13px;height:13px;border-radius:3px;background:#fff;border:2px solid var(--blue);cursor:nwse-resize;display:none}
+  .tb.sel .rs{display:block}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:90vw}
+  #toast.show{opacity:1;transform:translateX(-50%)}
+  .hint{font-size:12.5px;color:var(--mut);padding:0 14px 8px;display:flex;gap:16px;flex-wrap:wrap}
+  .hint b{color:var(--txt);font-weight:600}
+  #busy{position:fixed;inset:0;background:rgba(255,255,255,.6);display:none;place-items:center;z-index:60;font-weight:600}
+  #busy.show{display:grid}
+  #measure{position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;font-kerning:none;font-variant-ligatures:none;font-feature-settings:"liga" 0,"clig" 0,"calt" 0,"dlig" 0;line-height:1.25}
+</style>
+</head>
+<body class="mode-add">
+<header>
+  <div class="bar">
+    <div class="brand"><div class="logo">✍</div>PDF Viết Tay</div>
+    <div class="grp">
+      <button id="openBtn" class="primary" title="Mở file PDF (Ctrl+O)">📂 Mở PDF</button>
+      <span id="fileName">Chưa mở file</span>
+      <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+    </div>
+    <div class="grp">
+      <button id="zoomOut" class="icon" title="Thu nhỏ">−</button>
+      <span id="zoomLbl">100%</span>
+      <button id="zoomIn" class="icon" title="Phóng to">+</button>
+      <button id="zoomFit" title="Vừa chiều rộng">↔ Vừa khung</button>
+    </div>
+    <div class="grp">
+      <button id="modeAdd" class="on" title="Bấm lên trang để thêm chữ">✎ Thêm chữ</button>
+      <button id="modeSel" title="Chọn và kéo khung chữ">↖ Chọn / Di chuyển</button>
+    </div>
+    <div class="grp">
+      <div class="fp"><button id="fontBtn" title="Chọn phông chữ viết tay"><span id="fontBtnTxt">Patrick Hand</span><span class="cv">▼</span></button><div id="fontPanel"></div></div>
+      <span class="lbl">Cỡ</span>
+      <input type="number" id="sizeIn" min="6" max="200" step="1" value="20" title="Cỡ chữ (pt)">
+      <input type="color" id="colorIn" value="#1a2a7a" title="Màu mực">
+      <button class="sw sel" data-c="#1a2a7a" style="background:#1a2a7a" title="Xanh mực"></button>
+      <button class="sw" data-c="#111111" style="background:#111111" title="Đen"></button>
+      <button class="sw" data-c="#c81e1e" style="background:#c81e1e" title="Đỏ"></button>
+    </div>
+    <div class="grp">
+      <span class="lbl">Nghiêng thêm</span>
+      <input type="number" id="slantIn" min="0" max="30" step="1" value="0" title="Nghiêng thêm (độ)">
+      <label class="chk" title="Mỗi dòng lệch nhẹ như viết tay vội"><input type="checkbox" id="jitterIn"> Rung tay</label>
+    </div>
+    <div class="grp">
+      <button id="undoBtn" title="Hoàn tác (Ctrl+Z)" disabled>↶ Hoàn tác</button>
+      <button id="delBtn" title="Xóa khung chữ đang chọn (Delete)" disabled>🗑 Xóa</button>
+      <button id="saveBtn" class="primary" title="Lưu PDF mới (Ctrl+S)" disabled>💾 Lưu PDF</button>
+    </div>
+    <div class="status"><span class="dot" id="fontDot"></span><span id="fontStatus">Đang tải phông chữ…</span></div>
+  </div>
+  <div class="hint">
+    <span><b>Thêm chữ:</b> bấm vào vị trí bất kỳ trên trang rồi gõ (Enter để xuống dòng)</span>
+    <span><b>Di chuyển:</b> kéo nút ✥ hoặc dùng chế độ Chọn</span>
+    <span><b>Đổi cỡ:</b> kéo ô vuông góc dưới phải</span>
+    <span><b>Sửa:</b> bấm đúp vào chữ</span>
+  </div>
+</header>
+<main id="viewer">
+  <div id="empty">
+    <div class="drop">
+      <div class="big">📄</div>
+      <h2>Mở file PDF để bắt đầu</h2>
+      <p>Hỗ trợ cả bản <b>scan</b> (PDF chỉ có ảnh). Kéo thả file vào đây hoặc bấm nút bên dưới.<br>File được xử lý ngay trên máy của bạn, không tải lên đâu cả.</p>
+      <div class="hand" id="heroHand">Xin chào, Đồng ý ký tên</div>
+      <button class="primary" id="openBtn2">📂 Chọn file PDF</button>
+    </div>
+  </div>
+  <div id="pages" hidden></div>
+</main>
+<div id="measure"></div>
+<div id="toast"></div>
+<div id="busy"><div id="busyTxt">Đang xử lý…</div></div>
+
+<script type="module">
+import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+const WORKER_SRC = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_SRC;
+// Mở từ file:// không tạo được Worker trực tiếp từ CDN -> tải mã worker rồi chạy qua blob
+let workerInit = null;
+function initWorker() {
+  if (!workerInit) workerInit = (async () => {
+    try {
+      // Chrome không cho chạy module worker từ blob khi trang mở bằng file:// -> bỏ câu "export" để chạy dạng worker thường
+      let code = await (await fetch(WORKER_SRC)).text();
+      code = code.replace(/export\s*\{[^}]*\}\s*;?\s*(\/\/#[^\n]*)?\s*$/, '');
+      const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+      pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(url);
+    } catch (e) { console.warn('pdf.js worker fallback:', e); }
+  })();
+  return workerInit;
+}
+initWorker();
+const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/';
+
+/* ---------- Phông chữ viết tay (đã kiểm tra có đủ glyph tiếng Việt) ---------- */
+const GF = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/';
+const RAW = 'https://raw.githubusercontent.com/google/fonts/main/ofl/';
+const G_NEAT = 'Chữ viết tay gọn', G_SIGN = 'Kiểu chữ ký', G_DOC = 'Kiểu bác sĩ (viết nhanh)';
+// Tất cả đã kiểm tra bằng fontTools: đủ 134 chữ cái tiếng Việt (hoa + thường), 0 thiếu
+const FONTS = [
+  { key:'PatrickHand',   gf:'Patrick Hand',    name:'Patrick Hand',    group:G_NEAT, path:'patrickhand/PatrickHand-Regular.ttf' },
+  { key:'Mali',          gf:'Mali',            name:'Mali',            group:G_NEAT, path:'mali/Mali-Regular.ttf' },
+  { key:'Sriracha',      gf:'Sriracha',        name:'Sriracha',        group:G_NEAT, path:'sriracha/Sriracha-Regular.ttf' },
+  { key:'PlaywriteVN',   gf:'Playwrite VN',    name:'Playwrite VN (chữ học trò)', group:G_NEAT, path:'playwritevn/PlaywriteVN%5Bwght%5D.ttf' },
+  { key:'BadScript',     gf:'Bad Script',      name:'Bad Script',      group:G_NEAT, path:'badscript/BadScript-Regular.ttf' },
+  { key:'GrapeNuts',     gf:'Grape Nuts',      name:'Grape Nuts',      group:G_NEAT, path:'grapenuts/GrapeNuts-Regular.ttf' },
+  { key:'DancingScript', gf:'Dancing Script',  name:'Dancing Script',  group:G_SIGN, path:'dancingscript/DancingScript%5Bwght%5D.ttf' },
+  { key:'Charm',         gf:'Charm',           name:'Charm',           group:G_SIGN, path:'charm/Charm-Regular.ttf' },
+  { key:'GreatVibes',    gf:'Great Vibes',     name:'Great Vibes',     group:G_SIGN, path:'greatvibes/GreatVibes-Regular.ttf' },
+  { key:'AlexBrush',     gf:'Alex Brush',      name:'Alex Brush',      group:G_SIGN, path:'alexbrush/AlexBrush-Regular.ttf' },
+  { key:'MeaCulpa',      gf:'Mea Culpa',       name:'Mea Culpa',       group:G_SIGN, path:'meaculpa/MeaCulpa-Regular.ttf' },
+  { key:'Babylonica',    gf:'Babylonica',      name:'Babylonica',      group:G_DOC,  path:'babylonica/Babylonica-Regular.ttf' },
+  { key:'Ole',           gf:'Ole',             name:'Ole',             group:G_DOC,  path:'ole/Ole-Regular.ttf' },
+  { key:'QwitcherGrypen',gf:'Qwitcher Grypen', name:'Qwitcher Grypen', group:G_DOC,  path:'qwitchergrypen/QwitcherGrypen-Regular.ttf' },
+  { key:'Shalimar',      gf:'Shalimar',        name:'Shalimar',        group:G_DOC,  path:'shalimar/Shalimar-Regular.ttf' },
+  { key:'Waterfall',     gf:'Waterfall',       name:'Waterfall',       group:G_DOC,  path:'waterfall/Waterfall-Regular.ttf' },
+  { key:'Updock',        gf:'Updock',          name:'Updock',          group:G_DOC,  path:'updock/Updock-Regular.ttf' },
+];
+const fontByKey = k => FONTS.find(f => f.key === k);
+const SAMPLE = 'Bệnh nhân uống thuốc ngày 2 lần';
+const LH = 1.25;                  // line-height (phải trùng với CSS)
+const fontBytes = {};             // key -> ArrayBuffer
+const fontReady = {};             // key -> Promise
+const baseRatio = {};             // key -> baseline/size (đo trong trình duyệt)
+const cssFam = k => `'HW-${k}', cursive`;
+
+const $ = id => document.getElementById(id);
+// Xem trước phông trong danh sách: chỉ tải bản rút gọn (vài KB) chứa đúng các chữ cần hiển thị
+(() => {
+  const chars = [...new Set((SAMPLE + FONTS.map(f => f.name).join('')).replace(/\s/g, ''))].join('') + ' ';
+  const l = document.createElement('link'); l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?' + FONTS.map(f => 'family=' + f.gf.replace(/ /g, '+')).join('&') + '&text=' + encodeURIComponent(chars) + '&display=swap';
+  document.head.appendChild(l);
+})();
+const prevFam = f => `'${f.gf}', '${'HW-' + f.key}', cursive`;
+function buildPicker() {
+  const panel = $('fontPanel'); panel.innerHTML = '';
+  for (const g of [G_NEAT, G_SIGN, G_DOC]) {
+    const h = document.createElement('div'); h.className = 'fg'; h.textContent = g; panel.appendChild(h);
+    for (const f of FONTS.filter(f => f.group === g)) {
+      const it = document.createElement('button'); it.className = 'fi'; it.dataset.key = f.key;
+      it.innerHTML = `<span class="nm"></span><span class="pv"></span>`;
+      it.querySelector('.nm').textContent = f.name; const pv = it.querySelector('.pv');
+      pv.textContent = SAMPLE; pv.style.fontFamily = prevFam(f);
+      it.onclick = () => { closePicker(); chooseFont(f.key); };
+      panel.appendChild(it);
+    }
+  }
+}
+function openPicker() { const p = $('fontPanel'); p.classList.add('open'); p.querySelector('.fi.sel')?.scrollIntoView({ block: 'nearest' }); }
+function closePicker() { $('fontPanel').classList.remove('open'); }
+$('fontBtn').onclick = e => { e.stopPropagation(); $('fontPanel').classList.contains('open') ? closePicker() : openPicker(); };
+document.addEventListener('pointerdown', e => { if (!e.target.closest('.fp')) closePicker(); });
+buildPicker();
+function setFontStatus(state, txt) { $('fontDot').className = 'dot ' + state; $('fontStatus').textContent = txt; }
+async function chooseFont(key) {
+  cur.font = key; applyFontPreview();
+  const f = fontByKey(key);
+  if (!fontBytes[key]) setFontStatus('', `Đang tải phông ${f.name}…`);
+  try { await loadFont(f); setFontStatus('ok', `Sẵn sàng · ${FONTS.length} phông viết tay`); }
+  catch (e) { setFontStatus('err', `Không tải được ${f.name} (cần Internet)`); toast('Không tải được phông ' + f.name); return; }
+  applyToSelected(b => b.font = key);
+}
+
+async function fetchFont(f) {
+  let lastErr;
+  for (const url of [GF + f.path, RAW + f.path.replace('%5B','[').replace('%5D',']')]) {
+    try {
+      const r = await fetch(url, { mode:'cors' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.arrayBuffer();
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+function loadFont(f) {   // tải TTF khi cần (lần đầu dùng)
+  if (!fontReady[f.key]) fontReady[f.key] = (async () => {
+    const buf = await fetchFont(f);
+    fontBytes[f.key] = buf;
+    const ff = new FontFace('HW-' + f.key, buf.slice(0));
+    await ff.load(); document.fonts.add(ff);
+    baseRatio[f.key] = measureBaseline(f.key);
+    boxes.filter(b => b.font === f.key).forEach(layoutBox);
+    return buf;
+  })().catch(e => { delete fontReady[f.key]; throw e; });
+  return fontReady[f.key];
+}
+function measureBaseline(key) {
+  const S = 200, d = document.createElement('div');
+  d.style.cssText = `position:absolute;left:-99999px;top:0;font-family:${cssFam(key)};font-size:${S}px;line-height:${LH};white-space:pre;font-kerning:none;font-variant-ligatures:none`;
+  d.innerHTML = 'Ág<span style="display:inline-block;width:1px;height:0;vertical-align:baseline"></span>';
+  document.body.appendChild(d);
+  const r = d.lastChild.offsetTop / S; d.remove(); return r;
+}
+(async () => {   // chỉ tải sẵn phông mặc định
+  try { await loadFont(FONTS[0]); setFontStatus('ok', `Sẵn sàng · ${FONTS.length} phông viết tay`); }
+  catch (e) { setFontStatus('err', 'Không tải được phông (cần Internet)'); }
+  applyFontPreview();
+})();
+
+/* ---------- Trạng thái ---------- */
+let pdfDoc = null, origBytes = null, origName = 'tai-lieu.pdf';
+let pages = [];          // {num, rotate, vp1, el, canvas, layer}
+let boxes = [];          // {id, page, x, y, size, color, font, text, el, ta}
+let zoom = 1, mode = 'add', selected = null, nextId = 1;
+const cur = { font: FONTS[0].key, size: 20, color: '#1a2a7a', slant: 0, jitter: false };
+const history = [];
+
+function toast(msg, ms = 2600) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
+function busy(on, txt) { $('busy').classList.toggle('show', on); if (txt) $('busyTxt').textContent = txt; }
+function applyFontPreview() {
+  const f = fontByKey(cur.font);
+  $('fontBtnTxt').textContent = f.name; $('fontBtnTxt').style.fontFamily = prevFam(f);
+  $('heroHand').style.fontFamily = cssFam(f.key);
+  document.querySelectorAll('.fi').forEach(i => i.classList.toggle('sel', i.dataset.key === f.key));
+}
+
+/* ---------- Mở PDF ---------- */
+$('openBtn').onclick = $('openBtn2').onclick = () => $('fileInput').click();
+$('fileInput').onchange = e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ''; };
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+  const f = [...(e.dataTransfer?.files || [])].find(f => /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name));
+  if (f) openFile(f); else toast('Vui lòng thả một file PDF');
+});
+
+async function openFile(file) {
+  if (boxes.length && !confirm('Mở file mới sẽ bỏ các chữ đã thêm. Tiếp tục?')) return;
+  busy(true, 'Đang mở PDF…');
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await loadPdf(bytes, file.name);
+  } catch (e) { console.error(e); toast('Không mở được file: ' + (e.message || e), 5000); }
+  finally { busy(false); }
+}
+async function loadPdf(bytes, name) {
+  origBytes = bytes; origName = name || 'tai-lieu.pdf';
+  if (pdfDoc) pdfDoc.destroy();
+  await initWorker();
+  pdfDoc = await pdfjsLib.getDocument({
+    data: bytes.slice(), isEvalSupported: false,
+    cMapUrl: PDFJS_BASE + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS_BASE + 'standard_fonts/',
+  }).promise;
+  boxes.forEach(b => b.el.remove()); boxes = []; history.length = 0; selected = null; updateButtons();
+  $('fileName').textContent = origName; $('fileName').title = origName;
+  $('empty').hidden = true; $('pages').hidden = false; $('pages').innerHTML = '';
+  pages = [];
+  for (let n = 1; n <= pdfDoc.numPages; n++) {
+    const p = await pdfDoc.getPage(n);
+    const vp1 = p.getViewport({ scale: 1 });
+    const el = document.createElement('div'); el.className = 'page'; el.dataset.page = n - 1;
+    const canvas = document.createElement('canvas');
+    const layer = document.createElement('div'); layer.className = 'layer';
+    const num = document.createElement('div'); num.className = 'num'; num.textContent = `Trang ${n} / ${pdfDoc.numPages}`;
+    el.append(canvas, layer, num); $('pages').appendChild(el);
+    const pg = { num: n, pdfPage: p, rotate: p.rotate, vp1, el, canvas, layer, rendered: -1 };
+    pages.push(pg);
+    layer.addEventListener('pointerdown', e => onLayerDown(e, pg));
+  }
+  fitWidth(true);
+  $('saveBtn').disabled = false;
+  toast(`Đã mở ${pdfDoc.numPages} trang. Bấm lên trang để thêm chữ.`);
+}
+
+/* ---------- Hiển thị & thu phóng ---------- */
+let renderToken = 0;
+async function renderAll() {
+  const token = ++renderToken, dpr = Math.min(window.devicePixelRatio || 1, 3);
+  for (const pg of pages) {
+    const w = pg.vp1.width * zoom, h = pg.vp1.height * zoom;
+    pg.el.style.width = w + 'px'; pg.el.style.height = h + 'px';
+  }
+  boxes.forEach(layoutBox);
+  // vẽ các trang gần màn hình trước
+  const order = [...pages].sort((a, b) => Math.abs(a.el.getBoundingClientRect().top) - Math.abs(b.el.getBoundingClientRect().top));
+  for (const pg of order) {
+    if (token !== renderToken) return;
+    if (pg.rendered === zoom * dpr) continue;
+    const vp = pg.pdfPage.getViewport({ scale: zoom * dpr });
+    const c = document.createElement('canvas');
+    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    c.style.width = pg.vp1.width * zoom + 'px'; c.style.height = pg.vp1.height * zoom + 'px';
+    try { await pg.pdfPage.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; }
+    catch (e) { if (token !== renderToken) return; console.error(e); }
+    if (token !== renderToken) return;
+    pg.canvas.replaceWith(c); pg.canvas = c; pg.rendered = zoom * dpr;
+  }
+}
+function setZoom(z, keepCenter = true) {
+  z = Math.max(0.25, Math.min(5, z));
+  const v = $('viewer'), rx = (v.scrollLeft + v.clientWidth / 2) / (v.scrollWidth || 1), ry = (v.scrollTop + v.clientHeight / 2) / (v.scrollHeight || 1);
+  zoom = z; $('zoomLbl').textContent = Math.round(z * 100) + '%';
+  for (const pg of pages) pg.canvas.style.width = pg.vp1.width * zoom + 'px', pg.canvas.style.height = pg.vp1.height * zoom + 'px';
+  renderAll();
+  if (keepCenter) { v.scrollLeft = rx * v.scrollWidth - v.clientWidth / 2; v.scrollTop = ry * v.scrollHeight - v.clientHeight / 2; }
+}
+function fitWidth(top) {
+  if (!pages.length) return;
+  const maxW = Math.max(...pages.map(p => p.vp1.width));
+  setZoom(Math.min(top ? 1.3 : 2.5, ($('viewer').clientWidth - 60) / maxW), !top);
+  if (top) $('viewer').scrollTop = 0;
+}
+const STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
+$('zoomIn').onclick = () => setZoom(STEPS.find(s => s > zoom + 0.001) || 5);
+$('zoomOut').onclick = () => setZoom([...STEPS].reverse().find(s => s < zoom - 0.001) || 0.25);
+$('zoomFit').onclick = () => fitWidth(false);
+$('viewer').addEventListener('wheel', e => { if (e.ctrlKey && pages.length) { e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); } }, { passive: false });
+let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { pages.forEach(p => p.rendered = -1); renderAll(); }, 200); });
+
+/* ---------- Chế độ ---------- */
+function setMode(m) {
+  mode = m; document.body.className = 'mode-' + m;
+  $('modeAdd').classList.toggle('on', m === 'add'); $('modeSel').classList.toggle('on', m === 'select');
+}
+$('modeAdd').onclick = () => setMode('add');
+$('modeSel').onclick = () => setMode('select');
+
+/* ---------- Lịch sử (hoàn tác) ---------- */
+const snap = () => boxes.map(({ id, page, x, y, size, color, font, text, slant, jitter, seed }) => ({ id, page, x, y, size, color, font, text, slant, jitter, seed }));
+function pushHistory(s = snap()) { history.push(JSON.stringify(s)); if (history.length > 200) history.shift(); updateButtons(); }
+function undo() {
+  if (!history.length) return;
+  const s = JSON.parse(history.pop());
+  boxes.forEach(b => b.el.remove()); boxes = []; selected = null;
+  s.forEach(d => createBox(d, false));
+  updateButtons(); toast('Đã hoàn tác');
+}
+$('undoBtn').onclick = undo;
+function updateButtons() { $('undoBtn').disabled = !history.length; $('delBtn').disabled = !selected; }
+
+/* ---------- Khung chữ ---------- */
+function onLayerDown(e, pg) {
+  if (e.target !== pg.layer) return;
+  if (document.activeElement?.tagName === 'TEXTAREA') { document.activeElement.blur(); }
+  if (mode !== 'add') { select(null); return; }
+  e.preventDefault();
+  const r = pg.layer.getBoundingClientRect();
+  const x = (e.clientX - r.left) / zoom, y = (e.clientY - r.top) / zoom - cur.size * LH / 2;
+  pushHistory();
+  const b = createBox({ page: pages.indexOf(pg), x, y: Math.max(0, y), size: cur.size, color: cur.color, font: cur.font, slant: cur.slant, jitter: cur.jitter, text: '' }, true);
+  b.isNew = true;
+  b.ta.focus();
+}
+
+function createBox(d, sel) {
+  const b = { id: d.id || nextId++, page: d.page, x: d.x, y: d.y, size: d.size, color: d.color, font: d.font, text: d.text,
+    slant: d.slant || 0, jitter: !!d.jitter, seed: d.seed ?? (Math.random() * 1e9) >>> 0 };
+  loadFont(fontByKey(b.font)).catch(() => {});
+  nextId = Math.max(nextId, b.id + 1);
+  const el = document.createElement('div'); el.className = 'tb';
+  el.innerHTML = '<div class="tools"><button class="mv" title="Kéo để di chuyển">✥</button><button class="ed" title="Sửa chữ">✎</button><button class="del" title="Xóa">✕</button></div><div class="lines"></div><textarea spellcheck="false" placeholder="Nhập chữ…" rows="1" wrap="off"></textarea><div class="rs" title="Kéo để đổi cỡ chữ"></div>';
+  const ta = el.querySelector('textarea'); ta.value = b.text;
+  b.el = el; b.ta = ta;
+  pages[b.page].layer.appendChild(el);
+  boxes.push(b); layoutBox(b);
+
+  let before = null;
+  ta.addEventListener('focus', () => { before = snap(); select(b); });
+  ta.addEventListener('input', () => { b.text = ta.value; layoutBox(b); });
+  ta.addEventListener('blur', () => {
+    b.text = ta.value.normalize('NFC'); if (ta.value !== b.text) ta.value = b.text;
+    if (!b.text.trim()) {             // khung trống -> xóa
+      removeBox(b);
+      if (b.isNew) history.pop();       // không lưu thao tác thêm khung rỗng
+      else if (before) pushHistory(before);
+      updateButtons(); return;
+    }
+    if (before && !b.isNew && JSON.stringify(before) !== JSON.stringify(snap())) pushHistory(before);
+    b.isNew = false; before = null;
+  });
+  ta.addEventListener('keydown', e => { if (e.key === 'Escape') { ta.blur(); select(b); } e.stopPropagation(); });
+  // chế độ chọn: kéo trực tiếp; bấm đúp để sửa
+  ta.addEventListener('pointerdown', e => {
+    if (mode === 'select' && document.activeElement !== ta) { e.preventDefault(); select(b); startDrag(e, b); }
+  });
+  ta.addEventListener('dblclick', () => { ta.focus(); });
+  el.querySelector('.mv').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); select(b); startDrag(e, b); });
+  el.querySelector('.ed').addEventListener('click', () => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); });
+  el.querySelector('.del').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); deleteBox(b); });
+  el.querySelector('.rs').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); select(b); startResize(e, b); });
+  if (sel) select(b);
+  return b;
+}
+function layoutBox(b) {
+  const el = b.el, ta = b.ta, s = b.size * zoom;
+  el.style.left = b.x * zoom + 'px'; el.style.top = b.y * zoom + 'px';
+  ta.style.fontFamily = cssFam(b.font); ta.style.fontSize = s + 'px'; ta.style.color = b.color;
+  const m = $('measure'); m.style.fontFamily = ta.style.fontFamily; m.style.fontSize = s + 'px';
+  m.textContent = (ta.value || ta.placeholder);
+  const lines = (ta.value || ' ').split('\n').length;
+  ta.style.width = Math.ceil(m.getBoundingClientRect().width + Math.max(4, s * 0.3)) + 'px';
+  ta.style.height = Math.ceil(lines * s * LH) + 'px';
+  // Hiển thị từng dòng (cùng phép biến đổi sẽ dùng khi xuất PDF)
+  const holder = el.querySelector('.lines'), br = baseRatio[b.font] ?? 0.95;
+  const ls = lineGeom(b);
+  holder.textContent = '';
+  ls.forEach((g, i) => {
+    const sp = document.createElement('div'); sp.className = 'ln';
+    sp.textContent = g.text || '\u200b';
+    sp.style.cssText += `top:${i * s * LH}px;font-family:${cssFam(b.font)};font-size:${s}px;color:${b.color};` +
+      `transform-origin:0 ${br * s}px;transform:translate(${g.dx * zoom}px,${g.dy * zoom}px) rotate(${-g.rot}deg) skewX(${-g.slant}deg)`;
+    holder.appendChild(sp);
+  });
+}
+// Hình học từng dòng: độ nghiêng, xoay nhẹ, lệch dọc (đơn vị pt, độ). Dùng chung cho màn hình và PDF
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function lineGeom(b) {
+  const r = rng(b.seed), out = [];
+  (b.ta ? b.ta.value : b.text).split('\n').forEach(text => {
+    const j = b.jitter;
+    out.push({ text, slant: Math.max(0, Math.min(40, b.slant + (j ? (r() - 0.5) * 4 : 0))),
+      rot: j ? (r() - 0.5) * 2.6 : 0, dy: j ? (r() - 0.5) * 0.12 * b.size : 0, dx: j ? (r() - 0.5) * 0.25 * b.size : 0 });
+  });
+  return out;
+}
+function select(b) {
+  if (selected && selected !== b) selected.el.classList.remove('sel');
+  selected = b;
+  if (b) {
+    b.el.classList.add('sel');
+    cur.font = b.font; cur.size = b.size; cur.color = b.color; cur.slant = b.slant; cur.jitter = b.jitter; syncControls();
+  }
+  updateButtons();
+}
+function syncControls() {
+  applyFontPreview(); $('slantIn').value = cur.slant; $('jitterIn').checked = cur.jitter;
+  $('sizeIn').value = Math.round(cur.size * 10) / 10; $('colorIn').value = cur.color;
+  document.querySelectorAll('.sw').forEach(s => s.classList.toggle('sel', s.dataset.c.toLowerCase() === cur.color.toLowerCase()));
+}
+function removeBox(b) { b.el.remove(); boxes = boxes.filter(x => x !== b); if (selected === b) selected = null; }
+function deleteBox(b) { if (!b) return; pushHistory(); b.isNew = false; b.ta.value = ''; removeBox(b); updateButtons(); }
+$('delBtn').onclick = () => deleteBox(selected);
+
+function startDrag(e, b) {
+  const sx = e.clientX, sy = e.clientY, ox = b.x, oy = b.y, s0 = snap(); let moved = false;
+  const pg = pages[b.page];
+  const mv = ev => {
+    moved = true;
+    b.x = Math.max(-5, Math.min(pg.vp1.width - 5, ox + (ev.clientX - sx) / zoom));
+    b.y = Math.max(-5, Math.min(pg.vp1.height - 5, oy + (ev.clientY - sy) / zoom));
+    layoutBox(b);
+  };
+  const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (moved) pushHistory(s0); };
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+}
+function startResize(e, b) {
+  const sy = e.clientY, sx = e.clientX, s0 = b.size, h0 = b.ta.offsetHeight, snap0 = snap(); let moved = false;
+  const mv = ev => {
+    moved = true;
+    const d = Math.max(ev.clientY - sy, (ev.clientX - sx) * h0 / Math.max(1, b.ta.offsetWidth));
+    b.size = Math.max(6, Math.min(200, s0 * (h0 + d) / h0));
+    layoutBox(b); cur.size = b.size; $('sizeIn').value = Math.round(b.size);
+  };
+  const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (moved) pushHistory(snap0); };
+  window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+}
+
+/* ---------- Điều khiển kiểu chữ ---------- */
+function applyToSelected(fn) {
+  if (!selected) return;
+  const s0 = snap(); fn(selected); layoutBox(selected);
+  if (JSON.stringify(s0) !== JSON.stringify(snap())) pushHistory(s0);
+}
+$('slantIn').oninput = () => { const v = parseFloat($('slantIn').value); if (v >= 0 && v <= 30) { cur.slant = v; applyToSelected(b => b.slant = v); } };
+$('jitterIn').onchange = () => { cur.jitter = $('jitterIn').checked; applyToSelected(b => b.jitter = cur.jitter); };
+$('sizeIn').oninput = () => { const v = parseFloat($('sizeIn').value); if (v >= 6 && v <= 200) { cur.size = v; applyToSelected(b => b.size = v); } };
+function setColor(c) { cur.color = c; syncControls(); applyToSelected(b => b.color = c); }
+$('colorIn').oninput = () => setColor($('colorIn').value);
+document.querySelectorAll('.sw').forEach(s => s.onclick = () => setColor(s.dataset.c));
+// Giữ khung đang chọn khi bấm thanh công cụ
+document.querySelector('header').addEventListener('pointerdown', e => { if (e.target.closest('select,input,label,#fontPanel')) return; e.preventDefault(); });
+
+/* ---------- Phím tắt ---------- */
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); if (pdfDoc) savePdf(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'o') { e.preventDefault(); $('fileInput').click(); return; }
+  if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); undo(); }
+  else if ((k === 'delete' || k === 'backspace') && selected) { e.preventDefault(); deleteBox(selected); }
+  else if (k === 'escape') select(null);
+  else if (selected && k.startsWith('arrow')) {
+    e.preventDefault(); const st = (e.shiftKey ? 10 : 1) / zoom; pushHistory();
+    if (k === 'arrowleft') selected.x -= st; if (k === 'arrowright') selected.x += st;
+    if (k === 'arrowup') selected.y -= st; if (k === 'arrowdown') selected.y += st; layoutBox(selected);
+  }
+});
+
+/* ---------- Lưu PDF ---------- */
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return PDFLib.rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); }
+$('saveBtn').onclick = () => savePdf();
+async function savePdf() {
+  if (!origBytes) return;
+  document.activeElement?.blur?.();
+  const items = boxes.filter(b => b.text.trim());
+  busy(true, 'Đang tạo PDF…');
+  try {
+    const { PDFDocument, degrees } = PDFLib;
+    const doc = await PDFDocument.load(origBytes, { ignoreEncryption: true, updateMetadata: false });
+    doc.registerFontkit(window.fontkit);
+    const embedded = {};
+    for (const key of new Set(items.map(b => b.font))) {
+      const buf = await loadFont(fontByKey(key));
+      // Tắt ligature/phân số để chữ trong PDF trùng khớp với chữ trên màn hình
+      embedded[key] = await doc.embedFont(new Uint8Array(buf), { subset: false,
+        features: { liga: false, clig: false, calt: false, dlig: false, frac: false, numr: false, dnom: false, kern: false } });
+    }
+    // Cảnh báo ký tự mà phông không có (trên màn hình trình duyệt tự thay phông khác, nhưng PDF sẽ không hiện)
+    const missing = {};
+    for (const key in embedded) {
+      const cs = new Set(embedded[key].getCharacterSet());
+      for (const b of items.filter(b => b.font === key))
+        for (const ch of b.text.normalize('NFC')) if (!/\s/.test(ch) && !cs.has(ch.codePointAt(0))) (missing[key] ??= new Set()).add(ch);
+    }
+    const docPages = doc.getPages();
+    for (const b of items) {
+      const pg = pages[b.page], page = docPages[b.page], font = embedded[b.font];
+      const rot = ((pg.rotate % 360) + 360) % 360;
+      const br = baseRatio[b.font] ?? measureBaseline(b.font);
+      const geo = lineGeom({ ...b, ta: null, text: b.text.normalize('NFC') });
+      geo.forEach((g, i) => {
+        if (!g.text.length) return;
+        // điểm gốc = đầu đường chân chữ của dòng trên màn hình (zoom = 1, đã tính xoay trang) -> toạ độ PDF
+        const [px, py] = pg.vp1.convertToPdfPoint(b.x + g.dx, b.y + i * b.size * LH + br * b.size + g.dy);
+        // ma trận = dịch · xoay(trang + rung) · nghiêng — giống hệt transform CSS trên màn hình
+        const R = (rot + g.rot) * Math.PI / 180, t = Math.tan(g.slant * Math.PI / 180), c = Math.cos(R), si = Math.sin(R);
+        page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(c, si, c * t - si, si * t + c, px, py));
+        page.drawText(g.text, { x: 0, y: 0, size: b.size, font, color: hexRgb(b.color) });
+        page.pushOperators(PDFLib.popGraphicsState());
+      });
+    }
+    const out = await doc.save();
+    const base = origName.replace(/\.pdf$/i, '');
+    const outName = `${base}-da-chinh-sua.pdf`;
+    const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+    const a = document.createElement('a'); a.href = url; a.download = outName; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const miss = Object.entries(missing).map(([k, set]) => `${fontByKey(k).name}: ${[...set].join(' ')}`);
+    toast(`Đã lưu “${outName}” (${items.length} khung chữ)` + (miss.length ? ` · Lưu ý, phông không có ký tự → ${miss.join('; ')}` : ''), miss.length ? 9000 : 4000);
+  } catch (e) { console.error(e); toast('Lỗi khi lưu PDF: ' + (e.message || e), 6000); }
+  finally { busy(false); }
+}
+
+// Dùng cho kiểm thử tự động
+window.__editor = { chooseFont, FONTS_LIST: FONTS, cur, get selected(){return selected?.id}, loadPdf, createBox, savePdf, get boxes() { return boxes; }, get pages() { return pages; }, get zoom() { return zoom; }, setZoom, fontReady, baseRatio, FONTS };
+</script>
+</body>
+</html>

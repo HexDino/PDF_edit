@@ -1,0 +1,15 @@
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+contextBridge.exposeInMainWorld('api', {
+  isElectron: true,
+  initialFile: () => ipcRenderer.invoke('initial-file'),
+  openPdfDialog: () => ipcRenderer.invoke('open-pdf-dialog'),
+  readPdf: p => ipcRenderer.invoke('read-pdf', p),
+  savePdf: opts => ipcRenderer.invoke('save-pdf', opts),
+  setDirty: d => ipcRenderer.invoke('set-dirty', d),
+  showInFolder: p => ipcRenderer.invoke('show-in-folder', p),
+  pathForFile: f => { try { return webUtils.getPathForFile(f); } catch { return null; } },
+  onOpenPath: cb => ipcRenderer.on('open-path', (_e, p) => cb(p)),
+  sigList: () => ipcRenderer.invoke('sig-list'),
+  sigSave: d => ipcRenderer.invoke('sig-save', d),
+  sigDelete: id => ipcRenderer.invoke('sig-delete', id),
+});

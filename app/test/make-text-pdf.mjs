@@ -1,0 +1,12 @@
+import {PDFDocument, rgb} from 'pdf-lib'; import fontkit from '@pdf-lib/fontkit'; import fs from 'fs';
+const doc=await PDFDocument.create(); doc.registerFontkit(fontkit);
+const f=await doc.embedFont(fs.readFileSync('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'));
+const fb=await doc.embedFont(fs.readFileSync('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'));
+const p=doc.addPage([595.28,841.89]);
+p.drawRectangle({x:0,y:0,width:595.28,height:841.89,color:rgb(0.97,0.96,0.92)});
+p.drawText('GIẤY ĐỀ NGHỊ THANH TOÁN',{x:150,y:770,size:20,font:fb});
+const L=[['Họ và tên:','Trần Văn Bình'],['Số tài khoản:','0123456789'],['Ngân hàng:','Vietcombank – CN Nghệ An'],['Số tiền:','15.000.000 đồng']];
+L.forEach(([a,b],i)=>{p.drawText(a,{x:70,y:690-i*40,size:14,font:f}); p.drawText(b,{x:200,y:690-i*40,size:14,font:f});});
+p.drawText('Ghi chú: thanh toán trước ngày 30/10/2026.',{x:70,y:500,size:12,font:f});
+const p2=doc.addPage([595.28,841.89]); p2.drawText('Trang 2 – trang phụ lục, có thể xóa',{x:70,y:760,size:14,font:f});
+fs.writeFileSync('test/text-doc.pdf', await doc.save());

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+app/test/tools/node_modules/
+
+# Electron / electron-builder
+dist/
+release/
+out/
+*.exe
+*.msi
+*.blockmap
+*.7z
+
+# Tests
+app/test/out/
+app/test/smoke.png
+app/test/smoke-asar.png
+app/test/test/
+
+# OS & editor
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+
+# Playwright (if added later)
+playwright-report/
+test-results/

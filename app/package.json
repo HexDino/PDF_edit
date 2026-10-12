@@ -1,0 +1,88 @@
+{
+  "name": "trinh-sua-pdf",
+  "productName": "Trình sửa PDF",
+  "version": "1.0.0",
+  "description": "Trình sửa PDF – thêm chữ viết tay, tẩy xóa, chữ ký",
+  "author": "Nguyễn Thanh Hưng",
+  "main": "main.js",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "dist": "npm run build",
+    "test": "node test/smoke.mjs",
+    "test:e2e": "node test/e2e.mjs",
+    "test:overlay": "node test/overlay.mjs"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "playwright-core": "^1.64.0"
+  },
+  "build": {
+    "appId": "vn.nguyenthanhhung.trinhsuapdf",
+    "productName": "Trình sửa PDF",
+    "executableName": "TrinhSuaPDF",
+    "copyright": "© 2026 Nguyễn Thanh Hưng",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "build/icon.png",
+      "!test/**",
+      "!dist/**"
+    ],
+    "asar": true,
+    "electronLanguages": [
+      "vi",
+      "en-US"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true,
+      "fileAssociations": [
+        {
+          "ext": "pdf",
+          "name": "PDF",
+          "description": "Tài liệu PDF",
+          "role": "Editor"
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "TrinhSuaPDF-${version}-portable.exe"
+    },
+    "nsis": {
+      "artifactName": "TrinhSuaPDF-${version}-Setup.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Trình sửa PDF",
+      "uninstallDisplayName": "Trình sửa PDF",
+      "createDesktopShortcut": true,
+      "installerLanguages": [
+        "vi_VN",
+        "en_US"
+      ],
+      "language": "1066"
+    }
+  }
+}
