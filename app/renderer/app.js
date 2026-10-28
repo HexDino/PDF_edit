@@ -1559,6 +1559,13 @@ $('saveSessionBtn').onclick = () => saveSession(false);
 $('clearSessionBtn').onclick = () => clearSession();
 
 /* ======================= Phím tắt ======================= */
+const homeBtn = document.getElementById('homeBtn');
+if (homeBtn) homeBtn.onclick = async () => {
+  if (dirty && !confirm('Bạn có chỉnh sửa chưa lưu. Về trang chủ và bỏ các chỉnh sửa này?')) return;
+  API?.setDirty?.(false);
+  if (API?.suite?.goHome) await API.suite.goHome();
+  else location.href = 'index.html';
+};
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase(), c = e.ctrlKey || e.metaKey;
   // Khi có hộp thoại mở: chỉ xử lý Escape, chặn mọi phím tắt khác (tránh Ctrl+S lưu ngoài ý muốn)

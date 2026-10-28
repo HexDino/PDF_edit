@@ -15,4 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   sessionRead: p => ipcRenderer.invoke('session-read', p),
   sessionWrite: (p, d) => ipcRenderer.invoke('session-write', p, d),
   sessionDelete: p => ipcRenderer.invoke('session-delete', p),
+  suite: {
+    goHome: () => ipcRenderer.invoke('suite:go-home'),
+    openEditor: p => ipcRenderer.invoke('suite:open-editor', p),
+  },
 });

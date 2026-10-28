@@ -13,6 +13,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let win = null;
+let currentEntry = 'index.html';
 let dirty = false;
 let pendingFile = pdfFromArgv(process.argv);
 
@@ -29,7 +30,12 @@ if (!SKIP_LOCK && !app.requestSingleInstanceLock()) { app.quit(); }
 else {
   app.on('second-instance', (_e, argv) => {
     const f = pdfFromArgv(argv);
-    if (win) { if (win.isMinimized()) win.restore(); win.focus(); if (f) win.webContents.send('open-path', f); }
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
+    if (!f) return;
+    if (currentEntry === 'editor.html') win.webContents.send('open-path', f);
+    else openEditor(f);
   });
   app.whenReady().then(() => {
     protocol.handle('app', req => {
@@ -48,6 +54,24 @@ else {
   app.on('window-all-closed', () => app.quit());
 }
 
+function startEntry() {
+  if (pendingFile) return 'editor.html';
+  if (process.env.TSP_SUITE === '1') return 'index.html';
+  // Giữ nguyên hành vi các bộ test cũ: không truyền file thì mở editor.
+  if (process.env.TSP_NO_SINGLE_INSTANCE === '1') return 'editor.html';
+  return 'index.html';
+}
+
+function loadEntry(entry) {
+  currentEntry = entry;
+  win.loadURL('app://local/' + entry);
+}
+
+function openEditor(p) {
+  if (typeof p === 'string' && fs.existsSync(p)) pendingFile = p;
+  loadEntry('editor.html');
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1400, height: 900, minWidth: 900, minHeight: 600,
@@ -58,7 +82,7 @@ function createWindow() {
   win.setMenu(null);
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   if (process.env.TSP_DEBUG) win.webContents.on('console-message', (_e, lvl, msg, line, src) => fs.appendFileSync(require('os').tmpdir() + '/tsp-debug.log', `[console ${lvl}] ${msg} (${src}:${line})\n`));
-  win.loadURL('app://local/index.html');
+  loadEntry(startEntry());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', e => e.preventDefault());
   win.on('close', e => {
@@ -119,3 +143,7 @@ ipcMain.handle('session-delete', (_e, pdfPath) => {
   if (f && fs.existsSync(f)) fs.unlinkSync(f);
   return f;
 });
+
+// Điều hướng giữa trang chủ và trình sửa (dùng cho shell suite ở các task sau).
+ipcMain.handle('suite:go-home', () => { dirty = false; loadEntry('index.html'); return true; });
+ipcMain.handle('suite:open-editor', (_e, p) => { openEditor(p); return true; });

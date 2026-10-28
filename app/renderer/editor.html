@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self' data: blob:">
+<title>Trình sửa PDF</title>
+<link rel="stylesheet" href="styles.css">
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/fontkit.umd.min.js"></script>
+</head>
+<body class="tool-text">
+<header>
+  <div class="bar">
+    <button id="homeBtn" title="Về trang chủ">← Trang chủ</button>
+    <div class="brand"><div class="logo">✍</div>Trình sửa PDF</div>
+    <div class="grp">
+      <button id="openBtn" class="primary" title="Mở file PDF (Ctrl+O)">📂 Mở</button>
+      <button id="saveBtn" title="Lưu (Ctrl+S)" disabled>💾 Lưu</button>
+      <button id="saveAsBtn" title="Lưu thành file khác (Ctrl+Shift+S)" disabled>Lưu thành…</button>
+      <button id="saveSessionBtn" title="Lưu phiên chỉnh sửa cạnh file gốc để lần sau mở lại sửa tiếp" disabled>🗂 Lưu phiên</button>
+      <button id="clearSessionBtn" title="Xoá phiên chỉnh sửa của file này" disabled>Xoá phiên</button>
+    </div>
+    <div class="grp">
+      <button id="zoomOut" class="icon" title="Thu nhỏ (Ctrl −)">−</button>
+      <span id="zoomLbl">100%</span>
+      <button id="zoomIn" class="icon" title="Phóng to (Ctrl +)">+</button>
+      <button id="zoomFit" class="icon" title="Vừa chiều rộng">↔</button>
+    </div>
+    <div class="grp tools">
+      <button data-tool="select" title="Chọn / di chuyển (V)">↖ Chọn</button>
+      <button data-tool="text" class="on" title="Thêm chữ viết tay (T)">✎ Chữ</button>
+      <button data-tool="erase" title="Tẩy xóa: kéo khung che thông tin cũ (E)">▭ Tẩy xóa</button>
+      <button id="sigBtn" title="Chữ ký: vẽ, nhập ảnh, thư viện">✍ Chữ ký</button>
+      <button id="imgBtn" title="Chèn ảnh">🖼 Ảnh</button>
+      <button data-tool="pen" title="Bút vẽ tự do (P)">🖊 Bút</button>
+      <button data-tool="hl" title="Bút dạ quang (H)">🖍 Dạ quang</button>
+    </div>
+    <div class="grp">
+      <button id="undoBtn" title="Hoàn tác (Ctrl+Z)" disabled>↶ Hoàn tác</button>
+      <button id="redoBtn" title="Làm lại (Ctrl+Y)" disabled>↷ Làm lại</button>
+      <button id="delBtn" title="Xóa đối tượng đang chọn (Delete)" disabled>🗑 Xóa</button>
+    </div>
+    <div class="status"><span class="dot ok" id="dot"></span><span id="status">Sẵn sàng</span><span id="sessionTag" hidden></span></div>
+  </div>
+  <div class="ctx">
+    <!-- Chữ -->
+    <div class="sec" data-ctx="text">
+      <div class="fp"><button id="fontBtn" title="Phông chữ viết tay"><span id="fontBtnTxt">Patrick Hand</span><span class="cv">▼</span></button>
+        <div id="fontPanel">
+          <div class="fpBar">
+            <input type="search" id="fontSearch" placeholder="Tìm phông…" autocomplete="off">
+            <input type="text" id="fontPreviewText" placeholder="Chữ xem trước" autocomplete="off">
+          </div>
+          <div id="fontList"></div>
+        </div>
+      </div>
+      <span class="lbl">Cỡ</span><input type="number" id="sizeIn" min="4" max="200" step="1" value="18">
+      <span class="lbl">Nghiêng thêm</span><input type="number" id="slantIn" min="0" max="30" step="1" value="0">
+      <label class="chk" title="Mỗi dòng lệch nhẹ như viết vội"><input type="checkbox" id="jitterIn"> Rung tay</label>
+    </div>
+    <div class="sec" data-ctx="text pen hl img">
+      <span class="lbl">Màu</span>
+      <input type="color" id="colorIn" value="#1a2a7a">
+      <button class="sw" data-c="#1a2a7a" style="background:#1a2a7a" title="Xanh mực"></button>
+      <button class="sw" data-c="#111111" style="background:#111111" title="Đen"></button>
+      <button class="sw" data-c="#c81e1e" style="background:#c81e1e" title="Đỏ"></button>
+      <button class="sw hlsw" data-c="#ffe14d" style="background:#ffe14d" title="Vàng"></button>
+      <button class="sw hlsw" data-c="#7ee081" style="background:#7ee081" title="Xanh lá"></button>
+    </div>
+    <div class="sec" data-ctx="pen hl">
+      <span class="lbl">Nét</span><input type="number" id="penW" min="0.5" max="40" step="0.5" value="1.6">
+    </div>
+    <div class="sec" data-ctx="img">
+      <span class="lbl">Xoay</span><input type="number" id="rotIn" min="-180" max="180" step="1" value="0"><span class="lbl">°</span>
+      <span class="lbl">Ảnh màu ký: </span><button id="recolorBtn" title="Đổi màu nét chữ ký theo màu đang chọn">Đổi màu nét</button>
+    </div>
+    <div class="sec" data-ctx="erase rect">
+      <span class="lbl">Kiểu xoá</span>
+      <button data-es="rect" class="on" title="Kéo khung chữ nhật">▭ Khung</button>
+      <button data-es="brush" title="Cọ xoá tự do: kéo nét để xoá theo nét">🖌 Cọ xoá</button>
+      <button data-es="lasso" title="Khoanh vùng tự do rồi xoá cả vùng">✎ Khoanh vùng</button>
+      <label class="chk" title="Tự nới khung che cho vừa đúng dòng chữ bên dưới"><input type="checkbox" id="snapLines" checked> Bám dòng chữ</label>
+      <span class="lbl">Cỡ cọ</span><input type="number" id="brushW" min="4" max="120" step="2" value="16" title="Bề rộng nét cọ xoá">
+      <span class="lbl">Nền che</span>
+      <select id="fillModeIn" title="Cách tô vùng che">
+        <option value="solid">Một màu</option>
+        <option value="gradient">Chuyển sắc theo nền</option>
+        <option value="clone">Sao chép vùng trên</option>
+      </select>
+      <label class="chk" title="Làm mờ mép vùng che cho khỏi lộ đường viền"><input type="checkbox" id="featherIn"> Mờ mép</label>
+    </div>
+    <div class="sec" data-ctx="erase rect">
+      <span class="lbl">Màu nền che</span>
+      <input type="color" id="fillIn" value="#ffffff" title="Chọn màu thủ công">
+      <button id="autoFillBtn" title="Tự lấy màu nền xung quanh vùng che">✨ Tự lấy màu</button>
+      <button id="pickBtn" title="Lấy màu bằng ống hút: bấm vào chỗ bất kỳ trên trang">💧 Ống hút</button>
+      <label class="chk"><input type="checkbox" id="autoFillIn" checked> Tự lấy màu khi vẽ</label>
+      <span class="warn">⚠ Chỉ che phủ thì chữ cũ <b>vẫn có thể sao chép</b>. Khi lưu, bật “Xóa hẳn nội dung bị che”.</span>
+    </div>
+    <div class="sec hint" data-ctx="select">Kéo để di chuyển · góc dưới phải để đổi kích thước · Delete để xóa</div>
+  </div>
+</header>
+<div id="wrap">
+  <aside id="side"><div class="sideHead">Trang</div><div id="thumbs"></div></aside>
+  <main id="viewer">
+    <div id="empty">
+      <div class="drop">
+        <div class="big">📄</div>
+        <h2>Mở file PDF để bắt đầu</h2>
+        <p>Hỗ trợ PDF scan (chỉ có ảnh) và PDF chữ thường.<br>Kéo thả file vào đây hoặc bấm nút bên dưới. Mọi thứ xử lý ngay trên máy, không cần mạng.</p>
+        <div class="hand" id="heroHand">Xin chào, Đồng ý ký tên</div>
+        <button class="primary" id="openBtn2">📂 Chọn file PDF</button>
+      </div>
+    </div>
+    <div id="pages" hidden></div>
+  </main>
+</div>
+
+<!-- Hộp thoại chữ ký -->
+<div class="modal" id="sigModal" hidden>
+  <div class="dlg">
+    <div class="dlgHead"><b>Chữ ký</b>
+      <div class="tabs"><button data-tab="draw" class="on">✍ Vẽ chữ ký</button><button data-tab="image">🖼 Từ ảnh</button><button data-tab="lib">📚 Thư viện</button></div>
+      <button class="icon x" data-close>✕</button></div>
+    <div class="tab" data-tab="draw">
+      <div class="padWrap"><canvas id="pad"></canvas><div class="padLine">Ký vào đây</div></div>
+      <div class="row">
+        <span class="lbl">Màu mực</span>
+        <button class="sw ps sel" data-c="#1a2a7a" style="background:#1a2a7a"></button>
+        <button class="sw ps" data-c="#111111" style="background:#111111"></button>
+        <button class="sw ps" data-c="#c81e1e" style="background:#c81e1e"></button>
+        <span class="lbl">Độ đậm</span><input type="range" id="padW" min="1" max="8" step="0.5" value="3.2">
+        <button id="padUndo">↶ Nét trước</button><button id="padClear">Xóa hết</button>
+      </div>
+    </div>
+    <div class="tab" data-tab="image" hidden>
+      <div class="row"><button id="sigImgBtn" class="primary">Chọn ảnh chữ ký (PNG/JPG)…</button><span class="lbl">Chụp chữ ký trên giấy trắng, đủ sáng.</span></div>
+      <div class="imgPrev"><canvas id="sigImgCanvas"></canvas><div id="sigImgEmpty">Chưa chọn ảnh</div></div>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="bgRemove" checked> Tách nền (nền giấy → trong suốt)</label>
+        <span class="lbl">Độ nhạy</span><input type="range" id="bgTol" min="5" max="120" value="45">
+        <button id="bgAutoBtn" title="Tự tính độ nhạy theo từng ảnh (Otsu)">🎯 Tự động</button>
+        <label class="chk"><input type="checkbox" id="sigRecolor"> Tô lại màu mực</label>
+        <input type="color" id="sigRecolorC" value="#1a2a7a">
+        <label class="chk"><input type="checkbox" id="sigCrop" checked> Tự cắt sát</label>
+      </div>
+      <div class="row">
+        <span class="lbl">Làm đậm / mảnh nét</span><input type="range" id="sigWeight" min="30" max="250" value="100" title="Tăng để nét đậm rõ hơn, giảm để nét mảnh hơn">
+        <span class="lbl">(100 = giữ nguyên)</span>
+      </div>
+    </div>
+    <div class="tab" data-tab="lib" hidden><div id="libGrid"></div></div>
+    <div class="row" style="padding:2px 14px 10px">
+      <span class="lbl">Đặt nhanh vào góc:</span>
+      <button id="sigAtBL" title="Đặt ở góc dưới bên trái trang">↙ Dưới trái</button>
+      <button id="sigAtBC" title="Đặt ở giữa mép dưới trang">↓ Giữa dưới</button>
+      <button id="sigAtBR" title="Đặt ở góc dưới bên phải trang">↘ Dưới phải</button>
+      <label class="chk" title="Đặt lên tất cả các trang chưa bị xoá"><input type="checkbox" id="sigAllPages"> Tất cả các trang</label>
+    </div>
+    <div class="dlgFoot">
+      <label class="chk" id="saveLibWrap"><input type="checkbox" id="saveLib" checked> Lưu vào thư viện để dùng lại</label>
+      <label class="chk" id="keepPadWrap"><input type="checkbox" id="keepPad"> Giữ nét sau khi đặt</label>
+      <span style="flex:1"></span>
+      <button data-close>Hủy</button><button class="primary" id="sigUse">Đặt lên trang</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hộp thoại lưu -->
+<div class="modal" id="saveModal" hidden>
+  <div class="dlg small">
+    <div class="dlgHead"><b>Lưu PDF</b><span style="flex:1"></span><button class="icon x" data-close>✕</button></div>
+    <div class="pad16">
+      <p id="saveInfo"></p>
+      <label class="chk big"><input type="checkbox" id="trueRemove" checked> <b>Xóa hẳn nội dung bị che</b> (khuyên dùng)</label>
+      <div class="qOpts" id="flatOpts">
+        <div class="row">
+          <span class="lbl">Định dạng ảnh</span>
+          <select id="flatFormat">
+            <option value="auto">Tự động (khuyên dùng)</option>
+            <option value="png">PNG — không mất nét</option>
+            <option value="jpeg">JPEG — nhẹ hơn</option>
+          </select>
+          <span class="lbl">Độ phân giải</span>
+          <select id="flatDpi">
+            <option value="150">150 dpi</option>
+            <option value="200">200 dpi</option>
+            <option value="300" selected>300 dpi</option>
+            <option value="450">450 dpi</option>
+            <option value="600">600 dpi</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="lbl">Chất lượng JPEG</span>
+          <input type="range" id="flatQuality" min="60" max="100" value="90">
+          <span class="lbl" id="flatQualityLbl">90</span>
+          <span class="lbl" id="flatHint"></span>
+        </div>
+      </div>
+      <p class="note">Các trang có vùng tẩy xóa sẽ được chuyển thành ảnh trước khi vẽ nội dung mới, nên chữ/ảnh cũ dưới vùng che bị xóa thật, không thể sao chép hay khôi phục. Nhược điểm: chữ trên các trang đó không còn chọn/tìm kiếm được.</p>
+      <p class="note">Chế độ <b>Tự động</b> chọn PNG cho trang chữ (nét sắc, không mất dữ liệu) và JPEG cho trang scan/ảnh. Độ phân giải cao hơn thì file nặng hơn.</p>
+      <p class="note warnTxt">Nếu bỏ chọn: vùng che chỉ phủ lên trên — người khác vẫn có thể sao chép hoặc gỡ lớp che để xem nội dung cũ.</p>
+    </div>
+    <div class="dlgFoot"><span style="flex:1"></span><button data-close>Hủy</button><button class="primary" id="saveGo">Lưu</button></div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" hidden>
+<input type="file" id="sigImgInput" accept="image/png,image/jpeg,image/webp" hidden>
+<div id="measure"></div>
+<div id="toast"></div>
+<div id="busy"><div id="busyTxt">Đang xử lý…</div></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
