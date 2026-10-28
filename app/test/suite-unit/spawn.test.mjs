@@ -24,3 +24,19 @@ test('huỷ dừng nhanh', async () => {
   await assert.rejects(p, e => e.code === 'CANCELLED');
   assert.ok(Date.now() - t0 < 2000);
 });
+test('quá thời gian báo TIMEOUT và dừng tiến trình', async () => {
+  const t0 = Date.now();
+  await assert.rejects(
+    runProcess(process.execPath, ['-e', 'setTimeout(()=>{}, 5000)'], { timeoutMs: 150 }),
+    e => e.code === 'TIMEOUT',
+  );
+  assert.ok(Date.now() - t0 < 2000);
+});
+test('signal đã huỷ trước khi chạy vẫn báo CANCELLED', async () => {
+  const ac = new AbortController();
+  ac.abort();
+  await assert.rejects(
+    runProcess(process.execPath, ['-e', 'process.stdout.write("x")'], { signal: ac.signal }),
+    e => e.code === 'CANCELLED',
+  );
+});
