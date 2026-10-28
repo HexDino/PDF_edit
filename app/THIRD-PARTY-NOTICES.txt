@@ -1,0 +1,9 @@
+qpdf 12.4.2
+Copyright (c) 2005-2025 Jay Berkenbilt and contributors
+License: Apache License 2.0 — toàn văn tại licenses/Apache-2.0.txt
+Source: https://github.com/qpdf/qpdf
+Binary: qpdf-12.4.2-mingw64.zip
+SHA-256: 773D2FA0C7D161E2271430734338E560A07B25D0EDF11CEEE8E53DE435012766
+
+pdf-lib 1.17.1
+License: MIT — https://github.com/Hopding/pdf-lib

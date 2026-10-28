@@ -41,10 +41,16 @@
     "files": [
       "main.js",
       "preload.js",
+      "suite/**/*",
       "renderer/**/*",
       "build/icon.png",
+      "THIRD-PARTY-NOTICES.txt",
+      "licenses/**/*",
       "!test/**",
       "!dist/**"
+    ],
+    "extraResources": [
+      { "from": "bin", "to": "bin" }
     ],
     "asar": true,
     "electronLanguages": [
