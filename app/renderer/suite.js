@@ -5,6 +5,7 @@ const GROUPS = [
   ['organize', 'Tổ chức'], ['stamp', 'Đánh dấu'], ['convert', 'Chuyển đổi'],
   ['optimize', 'Tối ưu'], ['security', 'Bảo mật'],
 ];
+const OUT_LABEL_DEFAULT = 'Cùng thư mục file gốc';
 const state = {
   tools: [], tool: null, files: [], options: {}, outputDir: null,
   jobId: null, running: false, lastResult: null, lastError: null,
@@ -24,15 +25,24 @@ function renderNav() {
   const all = document.createElement('button');
   all.className = 'navItem' + (state.group ? '' : ' on');
   all.textContent = 'Trang chủ';
-  all.onclick = () => { state.group = null; renderNav(); renderGrid(); };
+  all.onclick = () => navHome(null);
   nav.appendChild(all);
   for (const [key, label] of GROUPS) {
     const b = document.createElement('button');
     b.className = 'navItem' + (state.group === key ? ' on' : '');
     b.textContent = label;
-    b.onclick = () => { state.group = key; renderNav(); renderGrid(); };
+    b.onclick = () => navHome(key);
     nav.appendChild(b);
   }
+}
+
+/** Rời tool view bằng hash/router rồi mới áp bộ lọc nhóm trên trang chủ. */
+function navHome(group) {
+  state.group = group;
+  if (location.hash) location.hash = '';
+  route();
+  renderNav();
+  renderGrid();
 }
 
 function renderGrid() {
@@ -51,6 +61,7 @@ function renderGrid() {
     for (const t of items) {
       const b = document.createElement('button');
       b.className = 'card'; b.disabled = t.status !== 'available';
+      b.dataset.toolId = t.id;
       b.innerHTML = `<span class="ic"></span><span><b></b><span></span></span>${t.status !== 'available' ? '<span class="st">Sắp có</span>' : ''}`;
       b.querySelector('.ic').textContent = t.icon || '▧';
       b.querySelector('b').textContent = t.title;
@@ -62,21 +73,52 @@ function renderGrid() {
   $('noResults').hidden = visible.length > 0;
 }
 
+/** Xoá hash lạ/công cụ chưa mở mà không tạo thêm history entry. */
+function clearHash() {
+  if (!location.hash) return;
+  try { history.replaceState(null, '', location.pathname + location.search); }
+  catch { location.hash = ''; }
+}
+function applyOutputDir(dir) {
+  state.outputDir = dir || null;
+  $('outLabel').textContent = dir || OUT_LABEL_DEFAULT;
+}
+/** Xoá UI job còn sót để Task 7 không hiển thị tiến trình của job cũ. */
+function resetJobUi() {
+  state.jobId = null;
+  state.running = false;
+  pendingJobEvents.length = 0;
+  $('progress').hidden = true;
+  $('cancelBtn').hidden = true;
+  $('progressBar').max = 1;
+  $('progressBar').value = 0;
+  $('progressText').textContent = '';
+}
+
 function route() {
   const m = /^#\/tool\/([\w-]+)$/.exec(location.hash);
   if (m) openTool(m[1]); else showHome();
 }
 function showHome() {
   state.tool = null;
+  state.files = [];
+  resetJobUi();
+  applyOutputDir(null);
   $('toolView').hidden = true; $('homeView').hidden = false;
 }
 async function openTool(id) {
   const tool = state.tools.find(t => t.id === id);
-  if (!tool) return showHome();
-  if (tool.status !== 'available') { toast('Công cụ này sẽ có ở đợt sau.'); location.hash = ''; return; }
-  state.tool = tool; state.files = []; state.outputDir = null;
-  state.lastResult = null; state.lastError = null; state.running = false;
+  if (!tool) { clearHash(); return showHome(); }
+  if (tool.status !== 'available') {
+    toast('Công cụ này sẽ có ở đợt sau.');
+    clearHash();
+    return showHome();
+  }
+  state.tool = tool; state.files = [];
+  state.lastResult = null; state.lastError = null;
   state.options = defaults(tool);
+  resetJobUi();
+  applyOutputDir(null);
   $('homeView').hidden = true; $('toolView').hidden = false;
   $('toolTitle').textContent = tool.title;
   $('toolBadge').hidden = true;
@@ -165,7 +207,7 @@ async function pickFiles() {
 async function pickOutput() {
   if (!S) return;
   const dir = await S.pickOutput();
-  if (dir) { state.outputDir = dir; $('outLabel').textContent = dir; }
+  if (dir) applyOutputDir(dir);
 }
 function updateRun() {
   const min = state.tool?.minFiles || 1;
@@ -276,7 +318,7 @@ window.__suite = {
   tools: () => state.tools,
   openTool: async id => { location.hash = '#/tool/' + id; await new Promise(r => setTimeout(r, 60)); return state.tool?.id; },
   addFiles,
-  setOutputDir: p => { state.outputDir = p; $('outLabel').textContent = p; },
+  setOutputDir: p => applyOutputDir(p),
   run,
   waitJob: (ms = 30000) => new Promise((resolve, reject) => {
     const t0 = Date.now();
