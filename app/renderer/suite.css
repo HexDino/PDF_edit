@@ -1,0 +1,53 @@
+.shell{display:flex;height:100%}
+.rail{width:232px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px 10px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;padding:4px 8px 16px;font-size:15px}
+.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#0b5cd5,#3b82f6);display:grid;place-items:center;color:#fff}
+#nav{display:flex;flex-direction:column;gap:2px;overflow:auto}
+.navItem{height:34px;border:0;background:transparent;text-align:left;padding:0 10px;border-radius:8px;color:var(--txt);cursor:pointer;font-size:13.5px}
+.navItem:hover{background:#f1f5fd}.navItem.on{background:#e6efff;color:var(--blue-d);font-weight:600}
+.railFoot{margin-top:auto;height:34px;border:1px solid var(--line);background:var(--panel);border-radius:8px;color:var(--mut);cursor:not-allowed}
+.workspace{flex:1;min-width:0;display:flex;flex-direction:column}
+.view{flex:1;min-height:0;display:flex;flex-direction:column;padding:18px 22px 26px;overflow:auto}
+.view[hidden]{display:none}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.topbar h1{font-size:22px;margin:0}
+.sub{margin:3px 0 0;color:var(--mut);font-size:12.5px}
+#toolSearch{width:min(320px,40vw);height:34px;border:1px solid var(--line);border-radius:var(--r);padding:0 12px;background:var(--panel);margin-left:auto}
+.dropZone{border:2px dashed #b9c5d6;border-radius:var(--r-lg);background:#fff;padding:22px;text-align:center;color:var(--mut);margin-bottom:18px}
+.dropZone.small{padding:14px;margin:0 0 10px;font-size:13px}
+.dropZone.over{border-color:var(--blue);background:#eef4ff}
+#toolGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.groupTitle{grid-column:1/-1;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);margin:12px 2px 0}
+.card{display:flex;align-items:flex-start;gap:10px;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-lg);padding:14px;cursor:pointer;min-height:84px}
+.card:hover:not(:disabled){border-color:#9db8e8;box-shadow:var(--shadow)}
+.card:disabled{opacity:.62;cursor:not-allowed}
+.card .ic{width:34px;height:34px;flex:none;border-radius:9px;background:#eef4ff;display:grid;place-items:center;font-size:17px}
+.card b{display:block;font-size:14px;margin-bottom:3px}
+.card span{font-size:12.5px;color:var(--mut);line-height:1.4}
+.card .st{margin-left:auto;font-size:10.5px;color:var(--warn);white-space:nowrap}
+.empty{color:var(--mut);text-align:center;padding:40px}
+.toolBody{display:grid;grid-template-columns:minmax(260px,1fr) minmax(300px,420px);gap:16px;align-items:start}
+@media (max-width:1000px){.toolBody{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px}
+.fileList{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto}
+.fileItem{display:flex;align-items:center;gap:6px;border:1px solid #eef1f5;border-radius:8px;padding:7px 8px;font-size:13px;background:#fafbfd}
+.fileItem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fileItem button{height:24px;width:26px;padding:0;border:0;background:transparent;border-radius:6px;cursor:pointer;color:var(--mut)}
+.fileItem button:hover{background:#eef2f8;color:var(--txt)}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:12.5px;color:var(--mut)}
+.field input[type=text],.field input[type=password],.field input[type=number],.field select{height:34px;border:1px solid var(--line);border-radius:9px;padding:0 10px;background:#fff;color:var(--txt)}
+.field .row{display:flex;align-items:center;gap:8px}
+.outRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
+.actions{display:flex;gap:8px;margin-top:8px}
+.progress{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.progress progress{width:100%;height:8px;accent-color:var(--blue)}
+.result{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;font-size:13px}
+.result .ok{color:#047857;font-weight:600}
+.result .err{color:#b91c1c}
+.result ul{margin:8px 0;padding-left:18px}
+.result .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(16px);background:#111827;color:#fff;padding:9px 16px;border-radius:10px;font-size:13.5px;opacity:0;pointer-events:none;transition:.2s;z-index:50}
+#toast.show{opacity:1;transform:translateX(-50%)}
+/* Thuộc tính hidden phải thắng display của component (.btn, .progress). */
+.btn[hidden],.progress[hidden]{display:none}

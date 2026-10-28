@@ -2,9 +2,66 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:">
 <title>Trình sửa PDF</title>
+<link rel="stylesheet" href="ui/tokens.css">
+<link rel="stylesheet" href="suite.css">
 </head>
 <body>
-<p id="boot">Đang tải…</p>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand"><span class="logo">✍</span><span>Trình sửa PDF</span></div>
+    <nav id="nav"></nav>
+    <button class="railFoot" id="settingsBtn" disabled title="Sắp có">Cài đặt</button>
+  </aside>
+  <div class="workspace">
+    <section id="homeView" class="view">
+      <header class="topbar">
+        <div>
+          <h1>Bộ công cụ PDF</h1>
+          <p class="sub">Chạy ngoại tuyến · không tải file lên mạng</p>
+        </div>
+        <input id="toolSearch" type="search" placeholder="Tìm công cụ…" autocomplete="off">
+        <button class="btn primary" id="editBtn">✎ Chỉnh sửa PDF</button>
+      </header>
+      <div class="dropZone" id="dropZone">Kéo thả PDF hoặc ảnh vào đây</div>
+      <div id="toolGrid"></div>
+      <p class="empty" id="noResults" hidden>Không tìm thấy công cụ nào.</p>
+    </section>
+
+    <section id="toolView" class="view" hidden>
+      <header class="topbar">
+        <button class="btn ghost" id="backBtn">← Trang chủ</button>
+        <h1 id="toolTitle"></h1>
+        <span class="badge" id="toolBadge" hidden>Sắp có</span>
+      </header>
+      <div class="toolBody">
+        <div class="pane filesPane">
+          <div class="dropZone small" id="toolDrop">Kéo thả file vào đây</div>
+          <ul id="fileList" class="fileList"></ul>
+          <button class="btn" id="addFilesBtn">+ Thêm file</button>
+        </div>
+        <div class="pane optionsPane">
+          <div id="options"></div>
+          <div class="outRow">
+            <button class="btn" id="outBtn">Chọn thư mục xuất…</button>
+            <span id="outLabel" class="muted">Cùng thư mục file gốc</span>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="runBtn" disabled>Chạy</button>
+            <button class="btn ghost" id="cancelBtn" hidden>Huỷ</button>
+          </div>
+          <div id="progress" class="progress" hidden>
+            <progress id="progressBar" max="1" value="0"></progress>
+            <span id="progressText" class="muted"></span>
+          </div>
+          <div id="result" class="result" hidden></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div id="toast"></div>
+<script type="module" src="suite.js"></script>
 </body>
 </html>
