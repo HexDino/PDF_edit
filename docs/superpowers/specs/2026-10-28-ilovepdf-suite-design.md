@@ -11,7 +11,8 @@ Mục tiêu: mở rộng Trình sửa PDF từ một editor đơn lẻ thành b�
 ### 1.1 Mục tiêu đợt 1
 - Có màn hình chọn công cụ, xử lý file lớn mà không treo UI, có tiến độ và huỷ.
 - 14 công cụ PDF thuần: ghép, tách, xoá/trích trang, tổ chức trang, crop, số trang & header/footer, watermark, PDF → ảnh, ảnh → PDF, HTML → PDF, nén, khoá, mở khoá, xoá metadata.
-- Editor hiện tại trở thành một mục riêng, không đổi hành vi (chữ ký, tẩy/xoá, phiên `.tsp.json`, 8 bộ test cũ).
+- Editor hiện tại trở thành một mục riêng: **giữ nguyên toàn bộ chức năng và hành vi** (chữ ký, tẩy/xoá, phiên `.tsp.json`, 8 bộ test cũ), chỉ **thiết kế lại giao diện** cho thống nhất với bộ công cụ.
+- Giao diện toàn app (home, tool, editor) dùng chung một hệ thống thiết kế; không chỉ thêm màn hình mới.
 - Không ghi đè file gốc mặc định; lỗi hiển thị ngắn gọn bằng tiếng Việt.
 
 ### 1.2 Không nằm trong đợt 1
@@ -19,6 +20,7 @@ Mục tiêu: mở rộng Trình sửa PDF từ một editor đơn lẻ thành b�
 - OCR (đợt 2), nén nâng cao theo ảnh nhúng (đợt 2), sửa file hỏng (đợt 2), so sánh PDF (đợt 2), chế độ hàng loạt cho mọi công cụ (đợt 2).
 - Ký chứng thư số, PDF/A, scan từ máy scan (đợt 3).
 - Cloud, tài khoản, đồng bộ, auto-update, bản mobile, chỉnh sửa text reflow thật trong PDF.
+- Không bỏ, không đổi hành vi bất kỳ chức năng hiện có nào; redesign chỉ ở tầng trình bày.
 
 ---
 
@@ -42,7 +44,7 @@ Hiện tại `renderer/app.js` (1.600 dòng) làm mọi thứ: mở file, render
 Thiết kế tách **shell + engine**:
 - Shell (renderer) chỉ dựng form, hiển thị tiến độ/kết quả.
 - Engine (main process) đọc/ghi file, gọi pdf-lib/qpdf/pdf.js, chạy job.
-- Editor giữ nguyên thành một trang riêng, không bị ảnh hưởng.
+- Editor vẫn là trang riêng và giữ nguyên logic; phần trình bày được thiết kế lại sau khi engine ổn định.
 
 ---
 
@@ -95,10 +97,12 @@ app/
       log.js                  # log xoay vòng
   bin/win32-x64/              # qpdf.exe (+ DLL) đợt 1; tesseract.exe + tessdata/ đợt 2
   renderer/
+    ui/tokens.css             # MỚI: màu, chữ, khoảng cách, trạng thái dùng chung
     index.html                # MỚI: shell home + tool
     suite.js, suite.css       # MỚI
-    editor.html               # MỚI: chuyển nguyên markup editor từ index.html
-    app.js, styles.css        # giữ nguyên
+    editor.html               # MỚI: markup editor (giữ id/class hợp đồng)
+    app.js                    # giữ nguyên logic
+    styles.css                # viết lại theo token chung (không đổi selector app.js dùng)
     worker/render.html        # MỚI: trang render pdf.js
     vendor/, fonts/           # giữ nguyên
   test/
@@ -266,23 +270,39 @@ Ghi chú:
 
 ### 6.6 Editor
 
-Giữ nguyên toàn bộ tính năng hiện có. Thay đổi duy nhất:
-- Chuyển markup sang `editor.html`; thêm nút “← Trang chủ” có kiểm tra thay đổi chưa lưu.
-- Nút “Xoá metadata khi lưu” **không** thêm ở đợt 1 (để tránh đổi hành vi phiên); người dùng dùng công cụ `metadata` sau khi lưu.
+Giữ nguyên **toàn bộ tính năng, phím tắt, luồng chữ ký/phiên và hợp đồng DOM** (`id`, `data-*`, class mà `app.js` và test dùng). Thay đổi:
+- Chuyển markup sang `editor.html`.
+- Thiết kế lại giao diện theo hệ thống chung: thanh trên cùng (quay về, tên file, hoàn tác/làm lại, lưu, zoom, trạng thái), rail công cụ bên trái, bảng thuộc tính bên phải, thumbnail thu gọn được, canvas ở giữa.
+- Thêm nút “← Trang chủ” có kiểm tra thay đổi chưa lưu.
+- Không thêm “Xoá metadata khi lưu” ở đợt 1 (để tránh đổi hành vi phiên); người dùng dùng công cụ `metadata` sau khi lưu.
+- Không đổi logic render/xuất/chữ ký/phiên; chỉ thêm hook điều hướng “Trang chủ”.
 
 ---
 
 ## 7. Giao diện
 
+### 7.0 Định hướng thiết kế lại
+
+- Giữ toàn bộ chức năng hiện có; redesign là thay đổi trình bày, không làm lại logic.
+- Một hệ thống chung cho home, tool và editor: token màu/chữ/khoảng cách, component (nút, ô nhập, thẻ, panel, progress, toast), trạng thái hover/active/disabled/focus.
+- Tối giản, tiếng Việt, mật độ vừa phải; không gradient trang trí, không icon ngoài bộ đang dùng; mỗi màn hình có một hành động chính rõ ràng.
+- Khung chung: rail trái (logo, Trang chủ, nhóm công cụ, Cài đặt), vùng nội dung; top bar đổi theo ngữ cảnh (home/tool/editor).
+- Cửa sổ tối thiểu 900×600; màn hẹp thì panel phải thu thành drawer, thumbnail ẩn được.
+- Nhóm “Sắp có” trên home cho OCR, nén nâng cao, so sánh, Office, PDF/A, ký số — disabled kèm nhãn đợt, không giả vờ đã có.
+- Giữ token hiện tại làm gốc: `--blue #0b5cd5`, Be Vietnam Pro, nền `#e9edf3`; tinh chỉnh thang chữ, khoảng cách, bo góc và trạng thái.
+
 ### 7.1 Home (`index.html`)
-- Thanh nhóm bên trái: Tổ chức · Đánh dấu · Chuyển đổi · Tối ưu · Bảo mật · Soạn thảo.
-- Ô tìm công cụ theo tên; lưới thẻ công cụ (icon, tên, mô tả một dòng).
-- Thẻ “Chỉnh sửa PDF” nổi bật (primary) mở editor.
+
+- Rail trái: Trang chủ; nhóm Tổ chức · Đánh dấu · Chuyển đổi · Tối ưu · Bảo mật · Soạn thảo; Cài đặt ở chân rail.
+- Top bar: tên app, ô tìm công cụ, nút “Chỉnh sửa PDF” primary.
+- Lưới thẻ công cụ: icon, tên, mô tả một dòng; thẻ “Chỉnh sửa PDF” nổi bật.
 - Vùng kéo-thả file: thả PDF → gợi ý công cụ phù hợp; thả ảnh → `images-pdf`; thả nhiều PDF → `merge`.
 - “File gần đây” (≤20): mở bằng editor hoặc mở thư mục; kiểm tra tồn tại khi hiển thị.
 - Trạng thái engine: qpdf/Tesseract sẵn sàng hay thiếu (chỉ hiện khi có vấn đề).
 
 ### 7.2 Trang công cụ
+
+- Bố cục hai cột: trái là file/thumbnail/preview, phải là panel tuỳ chọn; dưới cùng là thanh hành động.
 - Một màn hình 3 bước: **Chọn file → Tuỳ chọn → Kết quả**.
 - Danh sách file có đổi thứ tự, xoá, thêm; hiện số trang/kích thước sau khi đọc metadata.
 - Tuỳ chọn dựng từ schema; công cụ chọn trang có lưới thumbnail (render worker, tải lười theo cuộn) và ô nhập khoảng trang, hai cách đồng bộ nhau.
@@ -290,11 +310,26 @@ Giữ nguyên toàn bộ tính năng hiện có. Thay đổi duy nhất:
 - Trong khi chạy: thanh tiến độ, tên file đang xử lý, nút Huỷ; UI vẫn cuộn được.
 - Kết quả: dung lượng trước/sau, số file, lỗi từng file; nút “Mở thư mục”, “Chạy lại”, “Làm công cụ khác”.
 
-### 7.3 Style
-- Dùng token hiện tại: `--blue #0b5cd5`, Be Vietnam Pro, nền `#e9edf3`, tối giản, không icon lạ.
-- `suite.css` tách khỏi `styles.css`; không sửa style editor trừ nút quay về.
+### 7.3 Editor redesign (giữ nguyên chức năng)
 
-### 7.4 Cài đặt nhẹ
+- Top bar: “← Trang chủ”, tên file + trạng thái phiên, Hoàn tác/Làm lại, Lưu/Lưu thành, Zoom, trạng thái.
+- Rail trái: Chọn · Chữ · Tẩy xoá · Chữ ký · Ảnh · Bút · Dạ quang; phím tắt V/T/E/P/H giữ nguyên.
+- Panel phải: thuộc tính theo công cụ/đối tượng đang chọn (phông, cỡ, màu, nét, kiểu xoá, nền che, xoay ảnh); thay cho dải `.ctx` hai hàng hiện tại.
+- Giữa: canvas trang; thumbnail chuyển thành panel trái thu gọn/mở, không chiếm chỗ cố định.
+- Giữ nguyên **id, data-*, class hợp đồng** mà `app.js` và test dùng; chỉ đổi cấu trúc bao ngoài và CSS. Không đổi logic render/xuất/chữ ký/phiên.
+- Giữ các selector `app.js` truy vấn trực tiếp: `header`, `.ctx .sec`, `#side`, `#thumbs`, `#viewer`, `#pages`, `body.tool-*`; nếu buộc phải đổi thì cập nhật `app.js` và test trong cùng commit.
+- Modal chữ ký và Lưu dùng lại component chung (dialog, tab, form, progress); nội dung và luồng giữ nguyên.
+- Trạng thái rỗng, toast, busy, disabled dùng chung với tool pages.
+
+### 7.4 Thành phần và trạng thái
+
+- Component: `button` (primary/ghost/icon), `field`, `select`, `range`, `card`, `panel`, `tabs`, `dialog`, `progress`, `toast`, `empty`.
+- Trạng thái bắt buộc: hover, active, disabled, focus-visible; chữ không nhỏ hơn 12 px; vùng bấm ≥32 px.
+- Chuyển động nhẹ 120–180 ms; không animation khi `prefers-reduced-motion`.
+- Ảnh chụp nghiệm thu ở 1400×900 và 900×600 cho home, tool, editor.
+
+### 7.5 Cài đặt nhẹ
+
 Lưu JSON trong `userData/settings.json`: thư mục xuất mặc định, DPI mặc định (150), chế độ nén mặc định (lossless), ngôn ngữ OCR (đợt 2), số job song song (1–2). Không thêm thư viện.
 
 ---
@@ -370,7 +405,9 @@ Lưu JSON trong `userData/settings.json`: thư mục xuất mặc định, DPI m
 6. Watermark/số trang đúng trên trang xoay 90/270.
 7. HTML → PDF không phát sinh request mạng.
 8. Bản đóng gói portable và NSIS chạy được công cụ đầu tiên.
-9. 8 bộ test editor cũ vẫn xanh.
+9. 8 bộ test editor cũ vẫn xanh mà **không sửa selector**.
+10. Toàn bộ chức năng editor hiện có vẫn hoạt động sau redesign: mở/kéo-thả, zoom/thumbnail, xoá trang, chọn/ghim phông, chữ ký (vẽ/ảnh/thư viện/đặt góc), tẩy/xoá 3 kiểu, bám dòng, bút/dạ quang, phiên, hoàn tác/làm lại, nhân bản, lưu/lưu thành, phím tắt.
+11. Có ảnh chụp home/tool/editor ở 1400×900 và 900×600; không mất control nào so với danh sách chức năng hiện tại.
 
 ---
 
@@ -389,9 +426,9 @@ Lưu JSON trong `userData/settings.json`: thư mục xuất mặc định, DPI m
 ## 12. Lộ trình
 
 ### Đợt 1 (spec này)
-1. **M1 — Khung:** tách `editor.html`, shell home, preload/IPC, registry, job queue, render worker; 3 công cụ mẫu: `merge`, `pdf-images`, `protect`.
-2. **M2 — 11 công cụ còn lại:** mỗi công cụ kèm unit test; ưu tiên nhóm tổ chức → đánh dấu → chuyển đổi → tối ưu/bảo mật.
-3. **M3 — Đóng gói:** E2E, smoke asar, README, version 2.0.0, build portable + NSIS.
+1. **M1 — Khung + design system:** tách `editor.html`, shell home, token/component dùng chung, preload/IPC, registry, job queue, render worker; 3 công cụ mẫu: `merge`, `pdf-images`, `protect`. Editor tạm giữ giao diện cũ trong mốc này.
+2. **M2 — 11 công cụ còn lại:** mỗi công cụ kèm unit test; áp component system cho tool pages; ưu tiên nhóm tổ chức → đánh dấu → chuyển đổi → tối ưu/bảo mật.
+3. **M3 — Redesign editor + đóng gói:** thiết kế lại UI editor (thuần trình bày, giữ hợp đồng DOM), chạy lại 8 bộ test cũ, E2E, smoke asar, ảnh chụp, README, version 2.0.0, build portable + NSIS.
 
 Mỗi mốc chạy toàn bộ test cũ + mới trước khi sang mốc kế.
 
@@ -418,6 +455,8 @@ Ký chứng thư số PKCS#12, PDF/A (cân nhắc Ghostscript AGPL hoặc công 
 | Job treo do tiến trình con | Kill cây tiến trình, timeout mềm theo job, nút Huỷ |
 | File cụt khi lỗi giữa chừng | Ghi temp rồi move nguyên tử; dọn temp khi khởi động |
 | PDF/A, Office, ký số bị hiểu là “có trong đợt 1” | Ghi rõ trong README và UI (nhóm “Sắp có”) |
+| Redesign editor làm vỡ selector/test hoặc mất chức năng | Giữ id/class hợp đồng; checklist từng control hiện có; chạy 8 bộ test sau mỗi commit UI; ảnh chụp trước/sau |
+| 14 công cụ làm home quá tải | Nhóm + tìm kiếm + nhóm “Sắp có” thu gọn; mỗi thẻ chỉ một dòng mô tả |
 
 ---
 
