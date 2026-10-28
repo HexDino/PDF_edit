@@ -41,4 +41,25 @@ function moveAtomic(src, dst) {
   }
 }
 
-module.exports = { binaryPath, splitExt, outputName, uniquePath, moveAtomic };
+// Xuất bản file tạm ra tên đích mà không bao giờ ghi đè file đã có.
+// COPYFILE_EXCL tạo đích theo kiểu exclusive nên hai job chạy song song
+// chọn cùng tên sẽ chỉ một job thắng; job còn lại thử (2), (3), …
+function publishUnique(tempFile, dir, proposedName) {
+  fs.mkdirSync(dir, { recursive: true });
+  const { base, ext } = splitExt(proposedName);
+  for (let i = 1; i < 10000; i++) {
+    const candidate = path.join(dir, i === 1 ? proposedName : `${base} (${i})${ext}`);
+    try {
+      fs.copyFileSync(tempFile, candidate, fs.constants.COPYFILE_EXCL);
+    } catch (e) {
+      if (e.code === 'EEXIST') continue;
+      try { fs.unlinkSync(candidate); } catch { /* chưa tạo được file đích */ }
+      throw e;
+    }
+    try { fs.unlinkSync(tempFile); } catch { /* temp sẽ được job dọn dẹp */ }
+    return candidate;
+  }
+  throw new Error('Không tìm được tên file trống');
+}
+
+module.exports = { binaryPath, splitExt, outputName, uniquePath, moveAtomic, publishUnique };

@@ -186,6 +186,8 @@ try {
   console.log('merge result:', JSON.stringify(res));
   if (!res?.outputs?.length) throw new Error('Merge không tạo output');
   const outFile = res.outputs[0].path;
+  assert.equal(path.basename(outFile), 'm1a-a-ghep.pdf');
+  assert.equal(path.dirname(path.resolve(outFile)), path.resolve(outDir));
   const merged = await PDFDocument.load(fs.readFileSync(outFile));
   if (merged.getPageCount() !== 5) throw new Error('Sai số trang: ' + merged.getPageCount());
   console.log('merge ok:', outFile);
