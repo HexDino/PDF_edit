@@ -304,6 +304,37 @@ test('onEvent trả promise bị lỗi không tạo unhandled rejection', async 
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test('khởi động dọn thư mục job cũ, giữ thư mục mới', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tsp-jobs-'));
+  const jobs = path.join(root, 'jobs');
+  const stale = path.join(jobs, 'stale-job');
+  const fresh = path.join(jobs, 'fresh-job');
+  fs.mkdirSync(stale, { recursive: true });
+  fs.mkdirSync(fresh, { recursive: true });
+  fs.writeFileSync(path.join(stale, 'rác.pdf'), 'x');
+  const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  fs.utimesSync(stale, old, old);
+  const logs = [];
+  new JobRunner({ tools: [], qpdfPath: 'qpdf.exe', tempRoot: jobs, log: m => logs.push(m) });
+  assert.equal(fs.existsSync(stale), false);
+  assert.equal(fs.existsSync(fresh), true);
+  assert.equal(logs.some(m => m.includes('temp sweep removed stale-job')), true);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('lỗi hệ thống file từ tool được map sang payload an toàn', async () => {
+  const { root, runner, events } = setup(async () => {
+    throw Object.assign(new Error('ENOSPC: no space left, open C:\\bi-mat\\out.pdf'), { code: 'ENOSPC' });
+  });
+  const id = runner.start(argsFor(root));
+  await waitFor(() => terminalEvents(events, id).length === 1);
+  const terminal = terminalEvents(events, id);
+  assert.deepEqual(terminal.map(e => e.type), ['error']);
+  assert.deepEqual(terminal[0].error, { code: 'DISK_FULL', message: 'Không đủ dung lượng.' });
+  assert.equal(JSON.stringify(terminal[0].error).includes('C:'), false);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 async function waitFor(fn, timeout = 2000) {
   const start = Date.now();
   while (!fn()) {

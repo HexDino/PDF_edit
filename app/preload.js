@@ -7,7 +7,14 @@ contextBridge.exposeInMainWorld('api', {
   savePdf: opts => ipcRenderer.invoke('save-pdf', opts),
   setDirty: d => ipcRenderer.invoke('set-dirty', d),
   showInFolder: p => ipcRenderer.invoke('show-in-folder', p),
-  pathForFile: f => { try { return webUtils.getPathForFile(f); } catch { return null; } },
+  pathForFile: f => {
+    try {
+      const p = webUtils.getPathForFile(f);
+      // Đăng ký đường dẫn kéo-thả với main để job-start/reveal chấp nhận.
+      if (p) ipcRenderer.invoke('suite:register-input', [p]).catch(() => {});
+      return p;
+    } catch { return null; }
+  },
   onOpenPath: cb => ipcRenderer.on('open-path', (_e, p) => cb(p)),
   sigList: () => ipcRenderer.invoke('sig-list'),
   sigSave: d => ipcRenderer.invoke('sig-save', d),
@@ -16,12 +23,13 @@ contextBridge.exposeInMainWorld('api', {
   sessionWrite: (p, d) => ipcRenderer.invoke('session-write', p, d),
   sessionDelete: p => ipcRenderer.invoke('session-delete', p),
   suite: {
-    goHome: () => ipcRenderer.invoke('suite:go-home'),
+    goHome: opts => ipcRenderer.invoke('suite:go-home', opts),
     openEditor: p => ipcRenderer.invoke('suite:open-editor', p),
     tools: () => ipcRenderer.invoke('suite:tools'),
     health: () => ipcRenderer.invoke('suite:health'),
     pickFiles: opts => ipcRenderer.invoke('suite:pick-files', opts),
     pickOutput: () => ipcRenderer.invoke('suite:pick-output'),
+    registerInput: paths => ipcRenderer.invoke('suite:register-input', paths),
     reveal: p => ipcRenderer.invoke('suite:reveal', p),
     jobStart: req => ipcRenderer.invoke('suite:job-start', req),
     jobCancel: jobId => ipcRenderer.invoke('suite:job-cancel', { jobId }),

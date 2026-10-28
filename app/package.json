@@ -11,6 +11,7 @@
     "fetch:qpdf": "node scripts/fetch-qpdf.mjs",
     "test:tools": "node --test \"test/suite-unit/*.test.mjs\"",
     "test:suite": "node test/suite-e2e.mjs",
+    "prebuild": "npm run fetch:qpdf",
     "build": "electron-builder --win --x64",
     "dist": "npm run build",
     "test": "node test/smoke.mjs",

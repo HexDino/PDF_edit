@@ -320,6 +320,7 @@ window.__suite = {
   tools: () => state.tools,
   openTool: async id => { location.hash = '#/tool/' + id; await new Promise(r => setTimeout(r, 60)); return state.tool?.id; },
   addFiles,
+  registerInput: async paths => { if (S?.registerInput) await S.registerInput(paths); },
   setOutputDir: p => applyOutputDir(p),
   run,
   waitJob: (ms = 30000) => new Promise((resolve, reject) => {

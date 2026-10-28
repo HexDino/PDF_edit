@@ -48,6 +48,15 @@ npm install
 npm run build
 ```
 
+`npm run build` tự chạy `prebuild` → `npm run fetch:qpdf`: lần build đầu cần **mạng Internet** để tải qpdf 12.4.2 (mingw64 x64, kiểm SHA-256) vào `app/bin/win32-x64/`. Có thể tải trước thủ công:
+
+```bash
+cd app
+npm run fetch:qpdf
+```
+
+Nếu thiếu `qpdf.exe`/DLL, bước prebuild dừng build với thông báo rõ ràng. Thư mục `app/bin/` không được commit (đã nằm trong `.gitignore`) nhưng được đóng gói qua `extraResources` vào `resources/bin/`.
+
 Kết quả trong `app/dist/` (portable và bộ cài NSIS). Trên **Linux**, build Windows cần thêm **Wine** (và thường cả wine32/i386) để electron-builder chạy trình cài/gói Win:
 
 ```bash

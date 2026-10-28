@@ -1563,7 +1563,7 @@ const homeBtn = document.getElementById('homeBtn');
 if (homeBtn) homeBtn.onclick = async () => {
   if (dirty && !confirm('Bạn có chỉnh sửa chưa lưu. Về trang chủ và bỏ các chỉnh sửa này?')) return;
   API?.setDirty?.(false);
-  if (API?.suite?.goHome) await API.suite.goHome();
+  if (API?.suite?.goHome) await API.suite.goHome({ confirmed: true });
   else location.href = 'index.html';
 };
 window.addEventListener('keydown', e => {

@@ -10,9 +10,12 @@ const { runProcess } = require('./util/spawn');
 // vẫn được coi là đã huỷ và nhường slot, kể cả khi tool bỏ qua ctx.signal.
 const CANCEL_GRACE_MS = 1000;
 const PROGRESS_THROTTLE_MS = 100;
+// Thư mục job cũ hơn mốc này được coi là rác của lần chạy trước (crash/thoát
+// cưỡng bức). Mốc 1 giờ đủ rộng để không đụng job của instance test/dev đang chạy.
+const STALE_JOB_AGE_MS = 60 * 60 * 1000;
 
 class JobRunner {
-  constructor({ tools, onEvent, qpdfPath, tempRoot, concurrency = 2, log = () => {} }) {
+  constructor({ tools, onEvent, qpdfPath, tempRoot, concurrency = 2, log = () => {}, staleJobMaxAgeMs = STALE_JOB_AGE_MS }) {
     this.tools = new Map(tools.map(t => [t.id, t]));
     this.onEvent = onEvent;
     this.qpdfPath = qpdfPath;
@@ -22,6 +25,31 @@ class JobRunner {
     this.queue = [];
     this.running = new Map();
     fs.mkdirSync(this.tempRoot, { recursive: true });
+    this.#sweepStaleDirs(staleJobMaxAgeMs);
+  }
+
+  /** Dọn thư mục job còn sót từ lần chạy trước; lỗi chỉ ghi log. */
+  #sweepStaleDirs(maxAgeMs) {
+    let entries;
+    try {
+      entries = fs.readdirSync(this.tempRoot, { withFileTypes: true });
+    } catch (e) {
+      this.#safeLog(`temp sweep read error: ${e?.message || e}`);
+      return;
+    }
+    const cutoff = Date.now() - maxAgeMs;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const dir = path.join(this.tempRoot, entry.name);
+      try {
+        const stat = fs.statSync(dir);
+        if (stat.mtimeMs > cutoff) continue;
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+        this.#safeLog(`temp sweep removed ${entry.name}`);
+      } catch (e) {
+        this.#safeLog(`temp sweep failed ${entry.name}: ${e?.message || e}`);
+      }
+    }
   }
 
   start({ toolId, files, options, outputDir }) {

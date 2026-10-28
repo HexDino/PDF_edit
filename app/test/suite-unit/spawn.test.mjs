@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { runProcess } = require('../../suite/util/spawn.js');
+const { runProcess, killAllChildren } = require('../../suite/util/spawn.js');
 
 test('trả stdout và mã 0', async () => {
   const r = await runProcess(process.execPath, ['-e', 'process.stdout.write("ok")']);
@@ -39,4 +39,16 @@ test('signal đã huỷ trước khi chạy vẫn báo CANCELLED', async () => {
     runProcess(process.execPath, ['-e', 'process.stdout.write("x")'], { signal: ac.signal }),
     e => e.code === 'CANCELLED',
   );
+});
+test('killAllChildren an toàn khi không có tiến trình', () => {
+  assert.doesNotThrow(() => killAllChildren());
+  assert.doesNotThrow(() => killAllChildren());
+});
+test('killAllChildren dừng tiến trình con đang chạy', async () => {
+  const pending = runProcess(process.execPath, ['-e', 'setTimeout(()=>{}, 30000)']);
+  await new Promise(r => setTimeout(r, 150));
+  const t0 = Date.now();
+  killAllChildren();
+  await assert.rejects(pending);
+  assert.ok(Date.now() - t0 < 3000, 'killAllChildren phải dừng nhanh');
 });

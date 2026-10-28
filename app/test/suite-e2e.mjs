@@ -178,6 +178,8 @@ try {
 
   await w.evaluate(() => window.__suite.openTool('merge'));
   await w.waitForFunction(() => window.__suite.state.tool?.id === 'merge');
+  // E2E dùng đường dẫn trực tiếp (không qua hộp thoại) nên phải đăng ký trước.
+  await w.evaluate(({ files, out }) => window.__suite.registerInput([...files, out]), { files: [a, b], out: outDir });
   await w.evaluate(({ files, out }) => {
     window.__suite.addFiles(files); window.__suite.setOutputDir(out);
   }, { files: [a, b], out: outDir });
@@ -191,6 +193,18 @@ try {
   const merged = await PDFDocument.load(fs.readFileSync(outFile));
   if (merged.getPageCount() !== 5) throw new Error('Sai số trang: ' + merged.getPageCount());
   console.log('merge ok:', outFile);
+
+  // Đường dẫn chưa đăng ký bị từ chối, không lộ đường dẫn tuyệt đối ra UI.
+  const unregistered = path.join(APP_ROOT, 'test', 'text-doc.pdf');
+  const rejected = await w.evaluate(async p => ({
+    job: await window.api.suite.jobStart({ toolId: 'merge', files: [p], options: {}, outputDir: null }),
+    reveal: await window.api.suite.reveal(p),
+  }), unregistered);
+  assert.equal(rejected.job.ok, false);
+  assert.equal(rejected.job.error.code, 'FORBIDDEN');
+  assert.equal(rejected.job.error.message.includes(unregistered), false);
+  assert.equal(rejected.reveal, false);
+  console.log('allowlist: từ chối file chưa đăng ký · không lộ đường dẫn');
 } finally {
   await closeApp(app);
 }
