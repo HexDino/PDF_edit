@@ -106,7 +106,7 @@ import { fileURLToPath } from 'node:url';
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VERSION = '12.4.2';
-const ZIP_URL = `https://github.com/qpdf/qpdf/releases/download/v${VERSION}/qpdf-${VERSION}-mingw64_x64.zip`;
+const ZIP_URL = `https://github.com/qpdf/qpdf/releases/download/v${VERSION}/qpdf-${VERSION}-mingw64.zip`;
 const SHA256 = '773D2FA0C7D161E2271430734338E560A07B25D0EDF11CEEE8E53DE435012766';
 const DEST = path.join(APP_ROOT, 'bin', 'win32-x64');
 const EXE = path.join(DEST, 'qpdf.exe');
@@ -182,7 +182,7 @@ Sửa `app/package.json`:
 "scripts": {
   "start": "electron .",
   "fetch:qpdf": "node scripts/fetch-qpdf.mjs",
-  "test:tools": "node --test test/suite-unit",
+  "test:tools": "node --test \"test/suite-unit/*.test.mjs\"",
   "test:suite": "node test/suite-e2e.mjs"
 }
 ```
