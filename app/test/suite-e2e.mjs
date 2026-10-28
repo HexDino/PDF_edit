@@ -2,7 +2,10 @@ import { _electron as electron } from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'node:module';
 import { APP_ROOT, OUT, electronBin, electronEnv, closeApp } from './_paths.mjs';
+
+const require = createRequire(import.meta.url);
 
 const OUT_LABEL_DEFAULT = 'Cùng thư mục file gốc';
 const screenshotPath = path.join(OUT, 'suite-home.png');
@@ -157,6 +160,35 @@ try {
   await w.click('#editBtn');
   await w.waitForFunction(() => !!window.__app, null, { timeout: 30000 });
   console.log('editor mở được');
+
+  // Quay về home sau khi test editor ở Task 6
+  await w.click('#homeBtn');
+  await w.waitForFunction(() => window.__suite?.tools().length === 14, null, { timeout: 30000 });
+
+  const a = path.join(OUT, 'm1a-a.pdf'), b = path.join(OUT, 'm1a-b.pdf'), outDir = path.join(OUT, 'm1a-out');
+  fs.rmSync(outDir, { recursive: true, force: true });
+  fs.mkdirSync(outDir, { recursive: true });
+  const { PDFDocument } = require('pdf-lib');
+  async function make(file, n) {
+    const d = await PDFDocument.create();
+    for (let i = 0; i < n; i++) d.addPage([100 + i, 200]);
+    fs.writeFileSync(file, await d.save());
+  }
+  await make(a, 2); await make(b, 3);
+
+  await w.evaluate(() => window.__suite.openTool('merge'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'merge');
+  await w.evaluate(({ files, out }) => {
+    window.__suite.addFiles(files); window.__suite.setOutputDir(out);
+  }, { files: [a, b], out: outDir });
+  await w.click('#runBtn');
+  const res = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('merge result:', JSON.stringify(res));
+  if (!res?.outputs?.length) throw new Error('Merge không tạo output');
+  const outFile = res.outputs[0].path;
+  const merged = await PDFDocument.load(fs.readFileSync(outFile));
+  if (merged.getPageCount() !== 5) throw new Error('Sai số trang: ' + merged.getPageCount());
+  console.log('merge ok:', outFile);
 } finally {
   await closeApp(app);
 }

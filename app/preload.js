@@ -23,5 +23,8 @@ contextBridge.exposeInMainWorld('api', {
     pickFiles: opts => ipcRenderer.invoke('suite:pick-files', opts),
     pickOutput: () => ipcRenderer.invoke('suite:pick-output'),
     reveal: p => ipcRenderer.invoke('suite:reveal', p),
+    jobStart: req => ipcRenderer.invoke('suite:job-start', req),
+    jobCancel: jobId => ipcRenderer.invoke('suite:job-cancel', { jobId }),
+    onJobEvent: cb => ipcRenderer.on('suite:job-event', (_e, ev) => cb(ev)),
   },
 });

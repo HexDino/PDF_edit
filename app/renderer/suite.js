@@ -274,6 +274,8 @@ function onJob(ev) {
     $('progressText').textContent = ev.message || '';
     return;
   }
+  // queued/started (và sự kiện lạ) không phải trạng thái kết thúc.
+  if (ev.type !== 'done' && ev.type !== 'error' && ev.type !== 'cancelled') return;
   state.running = false;
   $('progress').hidden = true; $('cancelBtn').hidden = true; updateRun();
   if (ev.type === 'done') { state.lastResult = ev; renderResult(); }

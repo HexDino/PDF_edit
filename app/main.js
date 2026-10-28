@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { listTools, getTools } = require('./suite/registry');
 const { JobRunner } = require('./suite/jobs');
+const { toPayload } = require('./suite/errors');
 const { binaryPath } = require('./suite/util/paths');
 const { runProcess } = require('./suite/util/spawn');
 const { createLogger } = require('./suite/util/log');
@@ -89,6 +90,26 @@ else {
       else shell.showItemInFolder(p);
       return true;
     });
+    const logFile = path.join(app.getPath('userData'), 'logs', 'tools.log');
+    const log = createLogger(logFile);
+    const runner = new JobRunner({
+      tools: getTools(),
+      qpdfPath: binaryPath('qpdf.exe', {
+        appRoot: __dirname, isPackaged: app.isPackaged, resourcesPath: process.resourcesPath,
+      }),
+      tempRoot: path.join(app.getPath('temp'), 'TrinhSuaPDF', 'jobs'),
+      log,
+      onEvent: ev => { if (win && !win.isDestroyed()) win.webContents.send('suite:job-event', ev); },
+    });
+    ipcMain.handle('suite:job-start', (_e, req) => {
+      try {
+        return { ok: true, jobId: runner.start(req) };
+      } catch (e) {
+        log(`job-start rejected: ${e.stack || e.message}`);
+        return { ok: false, error: toPayload(e) };
+      }
+    });
+    ipcMain.handle('suite:job-cancel', (_e, { jobId } = {}) => runner.cancel(jobId));
     createWindow();
   });
   app.on('window-all-closed', () => app.quit());
