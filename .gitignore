@@ -2,6 +2,9 @@
 node_modules/
 app/test/tools/node_modules/
 
+# Binary công cụ tải về khi build (qpdf)
+app/bin/
+
 # Electron / electron-builder
 dist/
 release/

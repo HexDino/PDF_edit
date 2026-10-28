@@ -8,6 +8,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
+    "fetch:qpdf": "node scripts/fetch-qpdf.mjs",
+    "test:tools": "node --test \"test/suite-unit/*.test.mjs\"",
+    "test:suite": "node test/suite-e2e.mjs",
     "build": "electron-builder --win --x64",
     "dist": "npm run build",
     "test": "node test/smoke.mjs",
@@ -91,5 +94,8 @@
       ],
       "language": "1066"
     }
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
   }
 }
