@@ -36,3 +36,7 @@ app/test/*.tsp.json
 # Playwright (if added later)
 playwright-report/
 test-results/
+
+# Worktree & tiến trình subagent
+.worktrees/
+.superpowers/
