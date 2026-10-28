@@ -2,6 +2,11 @@
 const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { listTools, getTools } = require('./suite/registry');
+const { JobRunner } = require('./suite/jobs');
+const { binaryPath } = require('./suite/util/paths');
+const { runProcess } = require('./suite/util/spawn');
+const { createLogger } = require('./suite/util/log');
 
 const RENDERER = path.join(__dirname, 'renderer');
 // Tên nội bộ ASCII: tên có dấu lọt vào User-Agent làm hỏng mọi yêu cầu tải tài nguyên
@@ -48,6 +53,41 @@ else {
         const body = fs.readFileSync(p);
         return new Response(body, { headers: { 'content-type': MIME[path.extname(p).toLowerCase()] || 'application/octet-stream' } });
       } catch { return new Response('not found', { status: 404 }); }
+    });
+    let healthCache = null;
+    ipcMain.handle('suite:tools', () => listTools());
+    ipcMain.handle('suite:health', async () => {
+      if (healthCache) return healthCache;
+      const exe = binaryPath('qpdf.exe', {
+        appRoot: __dirname, isPackaged: app.isPackaged, resourcesPath: process.resourcesPath,
+      });
+      try {
+        const r = await runProcess(exe, ['--version']);
+        healthCache = {
+          qpdf: { ok: true, version: r.stdout.trim(), path: exe },
+          tesseract: { ok: false, planned: true },
+        };
+      } catch (e) {
+        healthCache = { qpdf: { ok: false, error: e.message, path: exe }, tesseract: { ok: false, planned: true } };
+      }
+      return healthCache;
+    });
+    ipcMain.handle('suite:pick-files', async (_e, { accept = ['.pdf'], multiple = false } = {}) => {
+      const r = await dialog.showOpenDialog(win, {
+        title: 'Chọn file', properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+        filters: [{ name: 'Tài liệu', extensions: accept.map(a => a.replace('.', '')) }],
+      });
+      return r.canceled ? [] : r.filePaths;
+    });
+    ipcMain.handle('suite:pick-output', async () => {
+      const r = await dialog.showOpenDialog(win, { title: 'Chọn thư mục xuất', properties: ['openDirectory', 'createDirectory'] });
+      return r.canceled ? null : r.filePaths[0];
+    });
+    ipcMain.handle('suite:reveal', (_e, p) => {
+      if (typeof p !== 'string' || !fs.existsSync(p)) return false;
+      if (fs.statSync(p).isDirectory()) shell.openPath(p);
+      else shell.showItemInFolder(p);
+      return true;
     });
     createWindow();
   });

@@ -18,5 +18,10 @@ contextBridge.exposeInMainWorld('api', {
   suite: {
     goHome: () => ipcRenderer.invoke('suite:go-home'),
     openEditor: p => ipcRenderer.invoke('suite:open-editor', p),
+    tools: () => ipcRenderer.invoke('suite:tools'),
+    health: () => ipcRenderer.invoke('suite:health'),
+    pickFiles: opts => ipcRenderer.invoke('suite:pick-files', opts),
+    pickOutput: () => ipcRenderer.invoke('suite:pick-output'),
+    reveal: p => ipcRenderer.invoke('suite:reveal', p),
   },
 });
