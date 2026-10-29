@@ -10,6 +10,7 @@ const { protect } = require('./pdfops/security');
 const { unlockTool } = require('./pdfops/unlock');
 const { metadataTool } = require('./pdfops/metadata');
 const { stampTool, stampOptions } = require('./pdfops/stamp');
+const { watermarkTool, watermarkOptions } = require('./pdfops/watermark');
 
 const TOOLS = [
   { id: 'merge', group: 'organize', title: 'Ghép PDF', description: 'Ghép nhiều file thành một, đổi được thứ tự.', icon: '⧉', accept: ['.pdf'], multiple: true, minFiles: 2, status: 'available', options: [], run: merge },
@@ -35,7 +36,7 @@ const TOOLS = [
     { key: 'pages', type: 'range', label: 'Khoảng trang', placeholder: '1-3,5 (trống = tất cả)' },
   ], run: cropTool },
   { id: 'stamp', group: 'stamp', title: 'Số trang & header/footer', description: 'Đánh số trang và chèn tiêu đề/chân trang.', icon: '#', accept: ['.pdf'], multiple: false, status: 'available', options: stampOptions, run: stampTool },
-  { id: 'watermark', group: 'stamp', title: 'Watermark', description: 'Chèn chữ hoặc ảnh mờ lên trang.', icon: '◈', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
+  { id: 'watermark', group: 'stamp', title: 'Watermark', description: 'Chèn chữ hoặc ảnh mờ lên trang.', icon: '◈', accept: ['.pdf'], multiple: false, status: 'available', options: watermarkOptions, run: watermarkTool },
   { id: 'pdf-images', group: 'convert', title: 'PDF → ảnh', description: 'Xuất từng trang thành JPG hoặc PNG.', icon: '🖼', accept: ['.pdf'], multiple: false, status: 'available', options: [
     { key: 'pages', type: 'range', label: 'Khoảng trang', placeholder: '1-3,5,8- (trống = tất cả)' },
     { key: 'dpi', type: 'int', min: 72, max: 600, default: 150, label: 'DPI' },

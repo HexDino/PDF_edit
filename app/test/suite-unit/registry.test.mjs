@@ -17,15 +17,43 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('12 công cụ khả dụng, 2 công cụ đang chờ', () => {
+test('13 công cụ khả dụng, 1 công cụ đang chờ', () => {
   const tools = listTools();
   for (const id of [
-    'merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata',
+    'merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'watermark',
+    'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata',
   ]) {
     assert.equal(tools.find(t => t.id === id).status, 'available');
   }
-  assert.equal(tools.filter(t => t.status === 'available').length, 12);
-  assert.equal(tools.filter(t => t.status === 'planned').length, 2);
+  assert.equal(tools.filter(t => t.status === 'available').length, 13);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 1);
+});
+test('watermark khả dụng với chữ hoặc ảnh và các tuỳ chọn đã duyệt', () => {
+  const tool = listTools().find(t => t.id === 'watermark');
+  assert.equal(tool.status, 'available');
+  assert.equal(tool.multiple, false);
+  assert.deepEqual(tool.accept, ['.pdf']);
+  const option = key => tool.options.find(o => o.key === key);
+  assert.equal(option('kind').type, 'enum');
+  assert.deepEqual(option('kind').values, ['text', 'image']);
+  assert.equal(option('kind').default, 'text');
+  assert.equal(option('text').type, 'text');
+  assert.equal(option('text').default, 'BẢN NHÁP');
+  assert.equal(option('imagePath').type, 'imageFile');
+  assert.equal(option('imagePath').default, '');
+  for (const [key, min, max, value] of [
+    ['fontSize', 12, 200, 60], ['opacity', 0, 100, 20], ['angle', -180, 180, 45], ['margin', 0, 100, 0],
+  ]) {
+    assert.equal(option(key).type, 'int');
+    assert.deepEqual([option(key).min, option(key).max], [min, max]);
+    assert.equal(option(key).default, value);
+  }
+  assert.equal(option('color').type, 'color');
+  assert.equal(option('color').default, '#c81e1e');
+  assert.equal(option('tile').type, 'bool');
+  assert.equal(option('tile').default, false);
+  assert.equal(option('pages').type, 'range');
+  assert.equal(option('pages').default, '');
 });
 test('split/pages có đủ tuỳ chọn cho UI', () => {
   const tools = listTools();

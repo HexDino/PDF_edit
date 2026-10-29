@@ -37,3 +37,21 @@ test('color accepts six hexadecimal digits, preserves defaults and rejects unsaf
     assert.throws(() => validateOptions(colored, { color }), e => e.code === 'INVALID_OPTIONS');
   }
 });
+
+test('imageFile accepts empty/normal paths, bounded length, and rejects NUL/CR/LF', () => {
+  const image = { options: [{ key: 'imagePath', type: 'imageFile', default: '' }] };
+  assert.deepEqual(validateOptions(image), { imagePath: '' });
+  assert.deepEqual(validateOptions(image, { imagePath: '' }), { imagePath: '' });
+  for (const imagePath of [
+    'C:\\thư mục\\ảnh.png',
+    '/home/user/a.jpg',
+    'a'.repeat(1000),
+  ]) {
+    assert.deepEqual(validateOptions(image, { imagePath }), { imagePath });
+  }
+  for (const imagePath of [
+    'a\0b.png', 'a\rb.png', 'a\nb.png', 'a'.repeat(1001), 42, null, ['a.png'],
+  ]) {
+    assert.throws(() => validateOptions(image, { imagePath }), e => e.code === 'INVALID_OPTIONS');
+  }
+});

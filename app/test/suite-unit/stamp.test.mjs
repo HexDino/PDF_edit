@@ -73,16 +73,16 @@ for (const position of ['header', 'footer']) {
   test(`${position}: real Vietnamese text is upright in PDF.js on 0/90/180/270 crop intersections`, async t => {
     const s = setup(t);
     await fixture(s.file, undefined, undefined, true);
+    // Freeze the clock so the expected dd/MM/yyyy never races midnight.
+    t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 9, 29, 10, 0, 0).getTime() });
     const before = fs.readFileSync(s.file);
     const result = await stamp(s.ctx({ leftText: 'Tiêu đề', centerText: 'Trang {page}/{total}', rightText: 'Ngày {date}', position }));
     const out = result.outputs[0].path;
     assert.deepEqual(pageBoxes(await PDFDocument.load(fs.readFileSync(out))), pageBoxes(await PDFDocument.load(before)));
     assert.deepEqual(fs.readFileSync(s.file), before);
-    const d = new Date();
-    const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     await inspect(out, pages => {
       pages.forEach(({ viewport, items }, i) => {
-        assert.deepEqual(items.map(x => x.str), ['Tiêu đề', `Trang ${i + 1}/4`, `Ngày ${date}`]);
+        assert.deepEqual(items.map(x => x.str), ['Tiêu đề', `Trang ${i + 1}/4`, 'Ngày 29/10/2026']);
         assert.deepEqual([viewport.width, viewport.height], i % 2 ? [700, 590] : [590, 700]);
         for (const item of items) {
           // PDF.js composes page rotation with the emitted text matrix. -rotation fails at 90/270.
@@ -124,6 +124,46 @@ for (const position of ['header', 'footer']) {
     });
   });
 }
+
+for (const position of ['header', 'footer']) {
+  test(`${position} fits a wide, short page where margin is inset from only one vertical edge`, async t => {
+    const s = setup(t);
+    await fixture(s.file, [0], [600, 300]);
+    const result = await stamp(s.ctx({ centerText: 'A', fontSize: 10, margin: 100, position }));
+    await inspect(result.outputs[0].path, pages => {
+      const { viewport, items } = pages[0];
+      assert.equal(items.length, 1);
+      assert.equal(items[0].str, 'A');
+      const glyph = realFont.layout('A').glyphs[0].bbox;
+      const baseline = items[0].view[5];
+      const top = baseline - glyph.maxY / realFont.unitsPerEm * 10;
+      const bottom = baseline - glyph.minY / realFont.unitsPerEm * 10;
+      assert.ok(top >= -0.01 && bottom <= 300.01, 'glyphs must stay inside the page');
+      if (position === 'header') assert.ok(top >= 100 * 72 / 25.4 - 0.01, 'header glyphs respect the margin');
+      else assert.ok(bottom <= 300 - 100 * 72 / 25.4 + 0.01, 'footer glyphs respect the margin');
+      near(items[0].view[4] + items[0].width / 2, viewport.width / 2, 'centered');
+    });
+  });
+}
+
+test('trims slot text before measuring so trailing spaces do not shift right alignment', async t => {
+  const s = setup(t);
+  await fixture(s.file, [0]);
+  const result = await stamp(s.ctx({ centerText: '', rightText: 'Cuối   ', fontSize: 10, margin: 10 }));
+  await inspect(result.outputs[0].path, pages => {
+    const { viewport, items } = pages[0];
+    assert.equal(items.length, 1);
+    assert.equal(items[0].str, 'Cuối');
+    const scale = 10 / realFont.unitsPerEm;
+    let advance = 0, right = -Infinity;
+    for (const glyph of realFont.layout('Cuối').glyphs) {
+      right = Math.max(right, advance + glyph.bbox.maxX);
+      advance += glyph.advanceWidth;
+    }
+    right = Math.max(right, advance);
+    near(items[0].view[4] + right * scale, viewport.width - 10 * 72 / 25.4, 'visible glyphs end at the right margin');
+  });
+});
 
 test('sorts and deduplicates selected pages; consecutive numbering and last assigned total', async t => {
   const s = setup(t);

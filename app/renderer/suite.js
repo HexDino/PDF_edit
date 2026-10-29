@@ -157,6 +157,26 @@ function renderOptions() {
       sel.value = state.options[o.key];
       sel.onchange = () => { state.options[o.key] = sel.value; };
       f.appendChild(sel);
+    } else if (o.type === 'imageFile') {
+      // Chỉ hiện tên file; đường dẫn tuyệt đối không bao giờ vào DOM.
+      const row = document.createElement('div'); row.className = 'row';
+      const shown = document.createElement('input');
+      shown.type = 'text'; shown.readOnly = true;
+      shown.value = state.options[o.key] ? baseName(state.options[o.key]) : '';
+      shown.placeholder = 'Chưa chọn ảnh';
+      const pick = document.createElement('button'); pick.textContent = 'Chọn ảnh';
+      pick.onclick = async () => {
+        const paths = await S.pickFiles({ accept: ['.png', '.jpg', '.jpeg'], multiple: false });
+        if (!paths?.length) return;
+        state.options[o.key] = paths[0];
+        shown.value = baseName(paths[0]);
+        clear.disabled = false;
+      };
+      const clear = document.createElement('button'); clear.textContent = 'Bỏ';
+      clear.disabled = !state.options[o.key];
+      clear.onclick = () => { state.options[o.key] = ''; shown.value = ''; clear.disabled = true; };
+      row.append(shown, pick, clear);
+      f.appendChild(row);
     } else {
       const inp = document.createElement('input');
       inp.type = o.type === 'int' ? 'number' : o.type === 'password' ? 'password' : o.type === 'color' ? 'color' : 'text';

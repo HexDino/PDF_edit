@@ -9,7 +9,7 @@ import { APP_ROOT, OUT, electronBin, electronEnv, closeApp } from './_paths.mjs'
 const require = createRequire(import.meta.url);
 const { runProcess } = require('../suite/util/spawn.js');
 const { binaryPath } = require('../suite/util/paths.js');
-const { PDFName } = require('pdf-lib');
+const { PDFName, rgb, degrees } = require('pdf-lib');
 const qpdf = (args, opts = {}) =>
   runProcess(binaryPath('qpdf.exe', { appRoot: APP_ROOT, isPackaged: false }), args, opts);
 
@@ -63,15 +63,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 12);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 2);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 2);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 13);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 1);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 1);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'watermark', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata'],
   );
-  console.log('home: 14 thẻ · 12 bật (merge, split, pages, organize, crop, stamp, pdf-images, images-pdf, html-pdf, protect, unlock, metadata) · 2 tắt · 2 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 13 bật (merge, split, pages, organize, crop, stamp, watermark, pdf-images, images-pdf, html-pdf, protect, unlock, metadata) · 1 tắt · 1 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -947,6 +947,8 @@ try {
   const dateBeforeStamp = new Date().toLocaleDateString('en-GB');
   await w.click('#runBtn');
   const stampRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  const dateAfterStamp = new Date().toLocaleDateString('en-GB');
+  const acceptedStampDates = new Set([dateBeforeStamp, dateAfterStamp]);
   assert.equal(stampRes?.outputs?.length, 1, JSON.stringify(stampRes));
   const stampFile = stampRes.outputs[0].path;
   assert.equal(path.basename(stampFile), 'm2-stamp-so-trang.pdf');
@@ -990,8 +992,15 @@ try {
     } finally { await loading.destroy(); }
   }, [...stampBytes]);
   assert.equal(viewed.length, 3);
+  const stampDates = new Set();
   viewed.forEach((page, i) => {
-    assert.deepEqual(page.items.map(x => x.str), ['Tiếng Việt gyp', `Trang ${i + 1}/3`, `Ngày ${dateBeforeStamp}`]);
+    assert.equal(page.items.length, 3);
+    assert.equal(page.items[0].str, 'Tiếng Việt gyp');
+    assert.equal(page.items[1].str, `Trang ${i + 1}/3`);
+    assert.match(page.items[2].str, /^Ngày \d{2}\/\d{2}\/\d{4}$/);
+    const date = page.items[2].str.slice('Ngày '.length);
+    assert.ok(acceptedStampDates.has(date), `stamp date ${date} must be before/after the run, not a race`);
+    stampDates.add(date);
     for (const item of page.items) {
       nearPt(item.view[0], 18, 'stamp advances right');
       nearPt(item.view[1], 0, 'stamp horizontal');
@@ -1008,12 +1017,218 @@ try {
     assert.equal(page.outsideFooter, 0, 'paint must remain in visible footer on rotated pages');
     fs.writeFileSync(path.join(OUT, `suite-stamp-page-${i + 1}.png`), Buffer.from(page.png.split(',')[1], 'base64'));
   });
+  assert.equal(stampDates.size, 1, 'one dd/MM/yyyy date must be used for the whole stamp job');
   await w.click('#runBtn');
   const stampAgain = await w.evaluate(() => window.__suite.waitJob(30000));
   assert.equal(path.basename(stampAgain.outputs[0].path), 'm2-stamp-so-trang (2).pdf');
   assert.deepEqual(fs.readFileSync(stampFile), stampBytes);
   assert.deepEqual(fs.readFileSync(stampSrc), stampSourceBytes);
   console.log('stamp ok: actual text/color form · Vietnamese/date · 0/90/270 upright cropped viewport · three rendered PNGs · no overwrite');
+
+  // 13. Watermark chữ: UI thật, fixture 0/90/180/270 + CropBox lệch gốc,
+  // PDF.js xác nhận góc nhìn và nội dung tiếng Việt không chứa ngày.
+  const wmSrc = path.join(OUT, 'm2-wm.pdf');
+  const wmOut = path.join(OUT, 'm2-wm-out');
+  fs.rmSync(wmOut, { recursive: true, force: true });
+  fs.mkdirSync(wmOut, { recursive: true });
+  const wmDoc = await PDFDocument.create();
+  for (const angle of [0, 90, 180, 270]) {
+    const page = wmDoc.addPage([430, 620]);
+    page.setMediaBox(50, 60, 430, 620);
+    page.setCropBox(80, 90, 380, 560);
+    page.setRotation(degrees(angle));
+  }
+  fs.writeFileSync(wmSrc, await wmDoc.save());
+  const wmSourceBytes = fs.readFileSync(wmSrc);
+
+  await w.locator('#nav .navItem', { hasText: 'Trang chủ' }).click();
+  await w.click('#toolGrid .card[data-tool-id="watermark"]');
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'watermark');
+  assert.equal(await w.locator('#toolTitle').textContent(), 'Watermark');
+  const wmField = label => w.locator('#options .field')
+    .filter({ has: w.locator('label', { hasText: label }) }).locator('input');
+  assert.equal(await wmField('Nội dung chữ').inputValue(), 'BẢN NHÁP');
+  assert.equal(await wmField('Cỡ chữ').inputValue(), '60');
+  assert.equal(await wmField('Độ mờ').inputValue(), '20');
+  assert.equal(await wmField('Góc xoay').inputValue(), '45');
+  assert.equal(await wmField('Lề').inputValue(), '0');
+  assert.equal(await w.locator('#options input[type="color"]').inputValue(), '#c81e1e');
+  assert.equal(await w.locator('#options input[readonly]').count(), 1, 'imageFile shows a readonly file name field');
+  assert.equal(await w.locator('#options input[readonly]').inputValue(), '');
+  assert.equal(await w.locator('#options button', { hasText: 'Chọn ảnh' }).count(), 1);
+  assert.equal(await w.locator('#options button', { hasText: 'Bỏ' }).count(), 1);
+  await wmField('Nội dung chữ').fill('BẢN NHÁP');
+  await wmField('Cỡ chữ').fill('48');
+  await wmField('Độ mờ').fill('35');
+  await wmField('Góc xoay').fill('30');
+  await wmField('Lề').fill('0');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: wmSrc, out: wmOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+  }, { file: wmSrc, out: wmOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const wmRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('watermark text result:', JSON.stringify(wmRes));
+  if (!wmRes?.outputs?.length) throw new Error('Watermark chữ không tạo output: ' + JSON.stringify(wmRes));
+  assert.equal(wmRes.outputs.length, 1);
+  assert.equal(wmRes.stats.pages, 4);
+  assert.equal(wmRes.stats.draws, 4);
+  const wmFile = wmRes.outputs[0].path;
+  assert.equal(path.basename(wmFile), 'm2-wm-watermark.pdf');
+  await qpdf(['--check', wmFile]);
+  const wmBytes = fs.readFileSync(wmFile);
+  const wmViewed = await w.evaluate(async bytes => {
+    const pdfjs = await import('./vendor/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', location.href).href;
+    const loading = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
+    const doc = await loading.promise;
+    try {
+      const pages = [];
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n);
+        const viewport = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+        const items = content.items.filter(i => i.str.trim()).map(i => ({
+          str: i.str, width: i.width, height: i.height,
+          view: pdfjs.Util.transform(viewport.transform, i.transform),
+          style: content.styles[i.fontName],
+        }));
+        pages.push({ width: viewport.width, height: viewport.height, items });
+      }
+      return pages;
+    } finally { await loading.destroy(); }
+  }, [...wmBytes]);
+  assert.equal(wmViewed.length, 4);
+  wmViewed.forEach((page, i) => {
+    assert.equal(page.items.length, 1);
+    const item = page.items[0];
+    assert.equal(item.str, 'BẢN NHÁP');
+    assert.equal(/\d{2}\/\d{2}\/\d{4}/.test(item.str), false, 'watermark text must be date-free');
+    assert.deepEqual([page.width, page.height], i % 2 ? [560, 380] : [380, 560]);
+    const angle = ((Math.atan2(-item.view[1], item.view[0]) * 180 / Math.PI) % 360 + 360) % 360;
+    nearPt(angle, 30, `watermark visual angle on rotated page ${i + 1}`, 0.02);
+    const ux = item.view[0] / 48, uy = item.view[1] / 48;
+    const vx = item.view[2] / 48, vy = item.view[3] / 48;
+    const cv = (item.style.ascent + item.style.descent) / 2 * 48;
+    const cx = item.view[4] + item.width / 2 * ux + cv * vx;
+    const cy = item.view[5] + item.width / 2 * uy + cv * vy;
+    nearPt(cx, page.width / 2, `watermark centered horizontally page ${i + 1}`, 1);
+    nearPt(cy, page.height / 2, `watermark centered vertically page ${i + 1}`, 1);
+  });
+  await w.click('#runBtn');
+  const wmAgain = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('watermark text again result:', JSON.stringify(wmAgain));
+  assert.equal(path.basename(wmAgain.outputs[0].path), 'm2-wm-watermark (2).pdf');
+  assert.deepEqual(fs.readFileSync(wmFile), wmBytes, 'first watermark output must stay unchanged');
+  assert.deepEqual(fs.readFileSync(wmSrc), wmSourceBytes, 'watermark source must stay unchanged');
+  console.log('watermark text ok: Vietnamese/date-free · visual angle 30° on 0/90/180/270 · centered · no overwrite');
+
+  // 13b. Watermark ảnh: opacity 50% kiểm bằng pixel render thật (pdf-images +
+  // nativeImage trong main process), XObject ảnh được nhúng.
+  const wmImgSrc = path.join(OUT, 'm2-wm-image.pdf');
+  const wmImgOut = path.join(OUT, 'm2-wm-image-out');
+  const wmPixelsOut = path.join(OUT, 'm2-wm-pixels-out');
+  fs.rmSync(wmImgOut, { recursive: true, force: true });
+  fs.rmSync(wmPixelsOut, { recursive: true, force: true });
+  fs.mkdirSync(wmImgOut, { recursive: true });
+  fs.mkdirSync(wmPixelsOut, { recursive: true });
+  const wmImgDoc = await PDFDocument.create();
+  wmImgDoc.addPage([200, 200]).drawRectangle({ x: 0, y: 0, width: 200, height: 200, color: rgb(1, 1, 1) });
+  fs.writeFileSync(wmImgSrc, await wmImgDoc.save());
+  const wmRedPng = path.join(OUT, 'm2-wm-red.png');
+  const redDataUrl = await w.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 80; canvas.height = 80;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(0, 0, 80, 80);
+    return canvas.toDataURL('image/png');
+  });
+  fs.writeFileSync(wmRedPng, Buffer.from(redDataUrl.split(',')[1], 'base64'));
+
+  await w.evaluate(() => {
+    window.__suite.state.files = [];
+    window.__suite.state.outputDir = null;
+  });
+  await w.evaluate(({ file, image, out }) => window.api.suite.registerInput([file, image, out]), {
+    file: wmImgSrc, image: wmRedPng, out: wmImgOut,
+  });
+  await w.evaluate(({ file, image, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({
+      kind: 'image', imagePath: image, text: 'BẢN NHÁP', fontSize: 60, color: '#c81e1e',
+      opacity: 50, angle: 0, tile: false, margin: 0, pages: '',
+    });
+  }, { file: wmImgSrc, image: wmRedPng, out: wmImgOut });
+  assert.equal(await w.locator('#options input[readonly]').inputValue(), 'm2-wm-red.png');
+  assert.equal((await w.locator('#options').textContent()).includes(wmImgOut), false, 'UI must not show absolute paths');
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const wmImgRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('watermark image result:', JSON.stringify(wmImgRes));
+  if (!wmImgRes?.outputs?.length) throw new Error('Watermark ảnh không tạo output: ' + JSON.stringify(wmImgRes));
+  const wmImgFile = wmImgRes.outputs[0].path;
+  assert.equal(path.basename(wmImgFile), 'm2-wm-image-watermark.pdf');
+  await qpdf(['--check', wmImgFile]);
+  const wmImgLoaded = await PDFDocument.load(fs.readFileSync(wmImgFile));
+  assert.equal(wmImgLoaded.getPageCount(), 1);
+  assert.deepEqual(pageImageSize(wmImgLoaded, wmImgLoaded.getPage(0)), { width: 80, height: 80 });
+
+  await w.evaluate(() => {
+    window.__suite.state.files = [];
+    window.__suite.state.outputDir = null;
+  });
+  await w.evaluate(() => window.__suite.openTool('pdf-images'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'pdf-images');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: wmImgFile, out: wmPixelsOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pages: '', dpi: 72, format: 'png', quality: 90 });
+  }, { file: wmImgFile, out: wmPixelsOut });
+  await w.click('#runBtn');
+  const wmPixelsRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('watermark pixels pdf-images result:', JSON.stringify(wmPixelsRes));
+  if (!wmPixelsRes?.outputs?.length) throw new Error('Render watermark không tạo PNG');
+  assert.equal(path.basename(wmPixelsRes.outputs[0].path), 'm2-wm-image-watermark-01.png');
+  assert.deepEqual(pngSize(fs.readFileSync(wmPixelsRes.outputs[0].path)), { width: 200, height: 200 });
+  const wmPixels = await app.evaluate(({ nativeImage }, pngPath) => {
+    const image = nativeImage.createFromPath(pngPath);
+    if (image.isEmpty()) return null;
+    const { width, height } = image.getSize();
+    const bitmap = image.toBitmap();
+    const at = (x, y) => {
+      const i = (y * width + x) * 4;
+      return [bitmap[i], bitmap[i + 1], bitmap[i + 2], bitmap[i + 3]];
+    };
+    return { width, height, center: at(100, 100), inside: at(100, 70), outside: at(45, 100), corner: at(5, 5) };
+  }, wmPixelsRes.outputs[0].path);
+  assert.ok(wmPixels, 'nativeImage must load the rendered watermark PNG');
+  assert.deepEqual([wmPixels.width, wmPixels.height], [200, 200]);
+  for (const point of [wmPixels.outside, wmPixels.corner]) {
+    assert.ok(point[0] >= 250 && point[1] >= 250 && point[2] >= 250, `white page outside mark: ${point}`);
+  }
+  const channels = wmPixels.center.slice(0, 3).sort((a, b) => a - b);
+  assert.ok(channels[2] >= 245, `red channel must stay saturated: ${wmPixels.center}`);
+  assert.ok(channels[1] >= 110 && channels[1] <= 145, `50% red over white is pink: ${wmPixels.center}`);
+  assert.ok(channels[0] >= 110 && channels[0] <= 145, `50% red over white is pink: ${wmPixels.center}`);
+  const insideChannels = wmPixels.inside.slice(0, 3).sort((a, b) => a - b);
+  assert.ok(insideChannels[1] >= 110 && insideChannels[1] <= 145, `image pixels carry 50% opacity: ${wmPixels.inside}`);
+  console.log('watermark image ok: PNG XObject 80×80 · pixel 50% red = pink · white outside');
+
+  // 13c. Ảnh chưa chọn/đăng ký qua picker bị main từ chối, không lộ đường dẫn.
+  const unregisteredImage = path.join(APP_ROOT, 'test', 'sig-photo.jpg');
+  const wmDenied = await w.evaluate(async ({ file, out, imagePath }) => window.api.suite.jobStart({
+    toolId: 'watermark', files: [file], options: { kind: 'image', imagePath }, outputDir: out,
+  }), { file: wmImgSrc, out: wmImgOut, imagePath: unregisteredImage });
+  assert.equal(wmDenied.ok, false);
+  assert.equal(wmDenied.error.code, 'FORBIDDEN');
+  assert.equal(wmDenied.error.message.includes(unregisteredImage), false, 'error must not echo the path');
+  assert.equal(wmDenied.error.message.includes(APP_ROOT), false, 'error must not echo a root path');
+  console.log('watermark image allowlist ok: FORBIDDEN · no path in message');
 } finally {
   if (remote) await new Promise(resolve => remote.close(resolve)).catch(() => {});
   await closeApp(app);

@@ -58,11 +58,17 @@ function layout(page, font, texts, options) {
   const rotation = normalizeRotation(page.getRotation().angle);
   const [width, height] = rotation % 180 ? [box.height, box.width] : [box.width, box.height];
   const margin = options.margin * 72 / 25.4;
-  const slots = texts.map((text, index) => text.trim() ? { text, index, ...measureStampText(font, text, options.fontSize) } : null).filter(Boolean);
+  const slots = texts.map((text, index) => {
+    // Trim once so trailing spaces cannot shift right/center alignment.
+    const value = text.trim();
+    return value ? { text: value, index, ...measureStampText(font, value, options.fontSize) } : null;
+  }).filter(Boolean);
   const ascent = Math.max(...slots.map(s => s.ascent));
   const descent = Math.min(...slots.map(s => s.descent));
   const invalid = () => new ToolError('INVALID_OPTIONS', 'Nội dung hoặc lề không vừa trang. Hãy giảm cỡ chữ, lề hoặc độ dài nội dung.');
-  if (width <= 2 * margin || height < 2 * margin + ascent - descent) throw invalid();
+  // Header/footer is inset from one vertical edge, so only one margin plus the
+  // visible glyph height has to fit (the other edge is free).
+  if (width <= 2 * margin || height < margin + ascent - descent) throw invalid();
   const dy = options.position === 'header' ? margin + ascent : height - margin + descent;
   for (const slot of slots) {
     if (slot.width > width - 2 * margin) throw invalid();

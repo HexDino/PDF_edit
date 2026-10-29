@@ -111,6 +111,15 @@ function assertJobPathsAllowed(req) {
   if (req.outputDir != null && !isAllowedRoot(req.outputDir)) {
     throw new ToolError('FORBIDDEN', 'Thư mục xuất chưa được chọn trong ứng dụng.');
   }
+  // Option kiểu imageFile cũng là đường dẫn người dùng phải chọn qua picker.
+  const tool = getTools().find(t => t.id === req.toolId);
+  const options = req.options && typeof req.options === 'object' && !Array.isArray(req.options) ? req.options : {};
+  for (const opt of tool?.options || []) {
+    if (opt.type !== 'imageFile') continue;
+    const value = options[opt.key];
+    if (value === undefined || value === null || value === '') continue;
+    if (!isAllowedFile(value)) throw new ToolError('FORBIDDEN', 'Ảnh chưa được chọn trong ứng dụng.');
+  }
 }
 
 // Khi chạy kiểm thử tự động (TSP_NO_SINGLE_INSTANCE=1), bỏ khoá một-instance để

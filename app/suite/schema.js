@@ -37,6 +37,12 @@ function validateOptions(tool, input = {}) {
         if (typeof v !== 'string' || v.length !== 7 || !/^#[0-9a-f]{6}$/i.test(v)) throw invalid(opt);
         out[opt.key] = v;
         break;
+      case 'imageFile':
+        // Empty is allowed: the tool decides whether an image is required.
+        // Paths never reach logs/messages; NUL/CR/LF are rejected at the schema.
+        if (typeof v !== 'string' || v.length > 1000 || /[\0\r\n]/.test(v)) throw invalid(opt);
+        out[opt.key] = v;
+        break;
       default:
         throw invalid(opt);
     }
