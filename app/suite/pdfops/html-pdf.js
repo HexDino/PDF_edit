@@ -46,9 +46,9 @@ async function htmlTool(ctx) {
   }
 
   ctx.progress('processing', 0, 1, 'Đang in HTML…');
-  let bytes;
+  let printed;
   try {
-    bytes = await ctx.printHtml({
+    printed = await ctx.printHtml({
       filePath: file,
       pageSize,
       landscape,
@@ -62,10 +62,12 @@ async function htmlTool(ctx) {
   }
   // Huỷ trong lúc in không được xuất file dở dang.
   ctx.signal.throwIfAborted();
+  const bytes = printed?.buffer;
   if (!Buffer.isBuffer(bytes) || !bytes.length
     || bytes.subarray(0, 5).toString('latin1') !== '%PDF-') {
     throw new ToolError('INTERNAL', 'Không in được HTML.');
   }
+  const blocked = Number.isInteger(printed?.blocked) && printed.blocked > 0 ? printed.blocked : 0;
 
   const root = ctx.outputDir || path.dirname(file);
   const name = `${splitExt(file).base}-html.pdf`;
@@ -77,8 +79,11 @@ async function htmlTool(ctx) {
   ctx.progress('done', 1, 1, 'Đã tạo PDF từ HTML');
   return {
     outputs: [{ path: dest }],
-    errors: [],
-    stats: { pageSize, landscape, printBackground, margin },
+    // Tài nguyên mạng bị chặn không làm hỏng job, nhưng PDF có thể thiếu ảnh/CSS.
+    errors: blocked > 0
+      ? [{ file, code: 'NETWORK_BLOCKED', message: 'Đã chặn tài nguyên mạng; PDF có thể thiếu ảnh/CSS.' }]
+      : [],
+    stats: { pageSize, landscape, printBackground, margin, blocked },
   };
 }
 

@@ -611,8 +611,8 @@ try {
   assert.equal(fs.existsSync(path.join(webpOut, 'm2-bad-anh.pdf')), false);
   console.log('images-pdf bad webp ok: INVALID_FILE · không tạo PDF');
 
-  // 10h. HTML → PDF: in file local bằng cửa sổ ẩn; ảnh remote trong HTML
-  // không được phát sinh request mạng nào.
+  // 10h. HTML → PDF: in file local bằng cửa sổ ẩn; ảnh/CSS/WebSocket remote
+  // trong HTML không được phát sinh request mạng nào và phải sinh cảnh báo.
   const htmlOut = path.join(OUT, 'm2-html-out');
   fs.rmSync(htmlOut, { recursive: true, force: true });
   fs.mkdirSync(htmlOut, { recursive: true });
@@ -623,6 +623,8 @@ try {
     res.setHeader('content-type', 'image/png');
     res.end(PNG_60x90);
   });
+  // WebSocket không được chạm tới server (ws/wss nằm trong danh sách chặn).
+  remote.on('upgrade', (_req, socket) => { remoteHits += 1; socket.destroy(); });
   await new Promise(resolve => remote.listen(0, '127.0.0.1', resolve));
   const remotePort = remote.address().port;
   // Chứng minh server có thể nhận request, sau đó đặt lại bộ đếm.
@@ -641,9 +643,15 @@ try {
   .box { padding: 24px; }
   h1 { font-size: 34px; margin: 0 0 12px; }
   p { font-size: 15px; line-height: 1.5; }
-</style></head>
+</style>
+<link rel="stylesheet" href="http://127.0.0.1:${remotePort}/remote.css">
+</head>
 <body><div class="box"><h1>HÓA ĐƠN HTML</h1><p>Nội dung in từ file HTML local.</p>
 <img src="http://127.0.0.1:${remotePort}/remote.png" alt="ảnh mạng" width="40" height="60">
+<script>
+  try { new WebSocket('ws://127.0.0.1:${remotePort}/ws'); } catch {}
+  try { new WebSocket('wss://127.0.0.1:${remotePort}/wss'); } catch {}
+</script>
 </div></body></html>`);
 
   await w.evaluate(() => window.__suite.openTool('html-pdf'));
@@ -673,6 +681,15 @@ try {
   console.log('html-pdf result:', JSON.stringify(htmlRes));
   if (!htmlRes?.outputs?.length) throw new Error('HTML → PDF không tạo output: ' + JSON.stringify(htmlRes));
   assert.equal(htmlRes.outputs.length, 1);
+  // Ảnh remote bị chặn vẫn tạo PDF nhưng phải kèm cảnh báo trong kết quả và UI.
+  assert.equal(Array.isArray(htmlRes.errors), true);
+  assert.equal(htmlRes.errors.length, 1, 'phải có đúng một cảnh báo mạng: ' + JSON.stringify(htmlRes.errors));
+  assert.equal(htmlRes.errors[0].code, 'NETWORK_BLOCKED');
+  assert.match(htmlRes.errors[0].message, /Đã chặn tài nguyên mạng/);
+  assert.ok(htmlRes.stats.blocked >= 3, 'phải đếm ảnh/CSS/ws bị chặn: ' + htmlRes.stats.blocked);
+  const htmlPanel = await w.evaluate(() => document.querySelector('#result')?.textContent || '');
+  assert.match(htmlPanel, /bị chặn/, 'panel kết quả phải hiện cảnh báo: ' + htmlPanel);
+  assert.equal(htmlPanel.includes(htmlSrc), false, 'panel không được lộ đường dẫn file');
   const htmlFile = htmlRes.outputs[0].path;
   assert.equal(path.basename(htmlFile), 'm2-page-html.pdf');
   assert.equal(path.dirname(path.resolve(htmlFile)), path.resolve(htmlOut));

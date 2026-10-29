@@ -213,6 +213,17 @@ function updateRun() {
   const min = state.tool?.minFiles || 1;
   $('runBtn').disabled = !state.tool || state.running || state.files.length < min || !S?.jobStart;
 }
+// Cảnh báo không làm hỏng job: chỉ hiện câu ngắn, không lộ đường dẫn/mã lỗi.
+const RESULT_WARNINGS = {
+  NETWORK_BLOCKED: 'Một số ảnh hoặc định dạng từ mạng đã bị chặn; PDF có thể thiếu nội dung.',
+};
+function resultWarning(errors) {
+  if (!Array.isArray(errors) || !errors.length) return '';
+  for (const e of errors) {
+    if (RESULT_WARNINGS[e?.code]) return RESULT_WARNINGS[e.code];
+  }
+  return 'Một số nội dung chưa xử lý được; kết quả có thể chưa đầy đủ.';
+}
 function renderResult() {
   const box = $('result');
   if (!state.lastResult && !state.lastError) { box.hidden = true; box.innerHTML = ''; return; }
@@ -223,8 +234,15 @@ function renderResult() {
     return;
   }
   const r = state.lastResult;
-  box.innerHTML = '<div class="ok"></div><ul></ul><div class="row"></div>';
+  box.innerHTML = '<div class="ok"></div><div class="warn" hidden></div><ul></ul><div class="row"></div>';
   box.querySelector('.ok').textContent = `Xong · ${r.outputs.length} file`;
+  const warning = resultWarning(r.errors);
+  if (warning) {
+    const warn = box.querySelector('.warn');
+    warn.textContent = warning;
+    warn.hidden = false;
+    warn.style.cssText = 'color:#b45309;margin-top:6px';
+  }
   for (const o of r.outputs) {
     const li = document.createElement('li');
     li.textContent = `${baseName(o.path)} · ${Math.max(1, Math.round((o.bytes || 0) / 1024))} KB`;

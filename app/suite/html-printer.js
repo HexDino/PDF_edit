@@ -15,6 +15,9 @@ const SETTLE_MS = 100;
 let printSession = null;
 let chain = Promise.resolve();
 const openWindows = new Set();
+// Số request mạng bị chặn theo webContents của từng cửa sổ in. Mỗi lần in đọc
+// con số này trước khi đóng cửa sổ để báo cho người dùng biết PDF có thể thiếu.
+const blockedByWindow = new Map();
 
 function cancelled() {
   return new ToolError('CANCELLED', 'Đã huỷ');
@@ -28,12 +31,32 @@ function printFailed() {
   return new ToolError('INTERNAL', 'Không in được HTML.');
 }
 
+// Bao một promise bằng tín hiệu huỷ để bước đang chờ kết thúc ngay khi job bị
+// huỷ, thay vì giữ hàng đợi tới timeout của bước đó.
+function raceAbort(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(cancelled());
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(cancelled());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      value => { signal.removeEventListener('abort', onAbort); resolve(value); },
+      error => { signal.removeEventListener('abort', onAbort); reject(error); },
+    );
+  });
+}
+
 function getPrintSession() {
   if (printSession) return printSession;
   const s = session.fromPartition(PARTITION);
   // Chỉ tài nguyên local được phép: mọi kết nối http(s)/ws(s) bị huỷ ngay
-  // trong webRequest, trước khi ra khỏi tiến trình.
-  const block = (_details, callback) => callback({ cancel: true });
+  // trong webRequest, trước khi ra khỏi tiến trình. Đếm theo webContents để
+  // lần in hiện tại biết mình đã bỏ qua bao nhiêu tài nguyên.
+  const block = (details, callback) => {
+    const id = details?.webContentsId;
+    if (Number.isInteger(id)) blockedByWindow.set(id, (blockedByWindow.get(id) || 0) + 1);
+    callback({ cancel: true });
+  };
   s.webRequest.onBeforeRequest(
     { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
     block,
@@ -48,8 +71,20 @@ function destroyWindow(win) {
   if (!win) return;
   openWindows.delete(win);
   try {
-    if (!win.isDestroyed()) win.destroy();
+    if (!win.isDestroyed()) {
+      blockedByWindow.delete(win.webContents.id);
+      win.destroy();
+    }
   } catch { /* cửa sổ đã đóng */ }
+}
+
+function blockedCount(win) {
+  if (!win) return 0;
+  try {
+    return blockedByWindow.get(win.webContents.id) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 function createPrintWindow() {
@@ -69,16 +104,23 @@ function createPrintWindow() {
     },
   });
   openWindows.add(win);
-  win.on('closed', () => openWindows.delete(win));
+  try {
+    win.on('closed', () => openWindows.delete(win));
 
-  const wc = win.webContents;
-  // Không cho trang mở cửa sổ mới hay tự điều hướng đi đâu khác.
-  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
-  wc.on('will-navigate', e => e.preventDefault());
-  wc.on('will-redirect', e => e.preventDefault());
-  wc.on('will-frame-navigate', e => e.preventDefault());
-  wc.on('will-attach-webview', e => e.preventDefault());
-  return win;
+    const wc = win.webContents;
+    // Không cho trang mở cửa sổ mới hay tự điều hướng đi đâu khác.
+    wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+    wc.on('will-navigate', e => e.preventDefault());
+    wc.on('will-redirect', e => e.preventDefault());
+    // Chặn cả iframe: trang in chỉ được là một tài liệu local duy nhất.
+    wc.on('will-frame-navigate', e => e.preventDefault());
+    wc.on('will-attach-webview', e => e.preventDefault());
+    return win;
+  } catch (e) {
+    // Không để cửa sổ nửa cấu hình rò rỉ nếu thiết lập sự kiện lỗi.
+    destroyWindow(win);
+    throw e;
+  }
 }
 
 function loadHtml(win, filePath, signal) {
@@ -93,6 +135,7 @@ function loadHtml(win, filePath, signal) {
       wc.removeListener('did-finish-load', onDone);
       wc.removeListener('did-fail-load', onFail);
       wc.removeListener('render-process-gone', onGone);
+      if (signal) signal.removeEventListener('abort', onAbort);
       fn(value);
     };
     const onDone = () => finish(resolve, true);
@@ -101,11 +144,20 @@ function loadHtml(win, filePath, signal) {
       finish(reject, signal?.aborted ? cancelled() : invalidHtml());
     };
     const onGone = () => finish(reject, signal?.aborted ? cancelled() : printFailed());
+    // Huỷ khi đang tải phải kết thúc ngay, không giữ hàng đợi tới load timeout.
+    const onAbort = () => finish(reject, cancelled());
 
     timer = setTimeout(() => finish(reject, printFailed()), LOAD_TIMEOUT_MS);
     wc.on('did-finish-load', onDone);
     wc.on('did-fail-load', onFail);
     wc.on('render-process-gone', onGone);
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+    }
     wc.loadURL(pathToFileURL(filePath).href).catch(() => {
       finish(reject, signal?.aborted ? cancelled() : invalidHtml());
     });
@@ -115,18 +167,23 @@ function loadHtml(win, filePath, signal) {
 // did-finish-load chưa bảo đảm webfont đã sẵn sàng; chờ document.fonts.ready
 // rồi thêm một nhịp ngắn để bố cục không đổi giữa lúc in.
 async function settleDocument(win, signal) {
+  let timer = null;
   try {
     // Font lỗi/chặn mạng cũng làm ready() resolve; timeout chỉ là chốt chặn
-    // để một trang hỏng không giữ cửa sổ in mãi.
-    await Promise.race([
+    // để một trang hỏng không giữ cửa sổ in mãi. Khi fonts.ready thắng thì
+    // phải xoá timeout, không để nó treo lại sau khi in xong.
+    await raceAbort(Promise.race([
       win.webContents.executeJavaScript(
         'document.fonts && document.fonts.ready ? document.fonts.ready.then(() => true) : true',
         false,
       ),
-      new Promise(resolve => setTimeout(resolve, FONT_TIMEOUT_MS)),
-    ]);
-  } catch {
-    throw signal?.aborted ? cancelled() : printFailed();
+      new Promise(resolve => { timer = setTimeout(resolve, FONT_TIMEOUT_MS); }),
+    ]), signal);
+  } catch (e) {
+    if (signal?.aborted || e?.code === 'CANCELLED') throw cancelled();
+    throw e instanceof ToolError ? e : printFailed();
+  } finally {
+    clearTimeout(timer);
   }
   if (signal?.aborted) throw cancelled();
   await new Promise(resolve => setTimeout(resolve, SETTLE_MS));
@@ -140,7 +197,7 @@ async function renderPdf(win, opts, signal) {
     timer = setTimeout(() => reject(printFailed()), PRINT_TIMEOUT_MS);
   });
   try {
-    const data = await Promise.race([
+    const data = await raceAbort(Promise.race([
       win.webContents.printToPDF({
         pageSize: opts.pageSize,
         landscape: opts.landscape,
@@ -151,7 +208,7 @@ async function renderPdf(win, opts, signal) {
         preferCSSPageSize: false,
       }),
       timeout,
-    ]);
+    ]), signal);
     if (signal?.aborted) throw cancelled();
     return Buffer.from(data);
   } catch (e) {
@@ -189,7 +246,12 @@ function normalize(options) {
 /**
  * In một file HTML local thành PDF bằng cửa sổ ẩn. Các lần in được xếp hàng
  * tuần tự vì mỗi lần dùng một cửa sổ Chromium riêng.
- * @returns {Promise<Buffer>}
+ *
+ * Trả về `{ buffer, blocked }`; `blocked` là số request http/https/ws/wss đã bị
+ * chặn trong lần in này. Giới hạn đã biết: WebRTC/STUN, DNS prefetch và
+ * preconnect không đi qua webRequest nên không bị chặn/đếm; iframe (kể cả
+ * local) bị từ chối vì `will-frame-navigate` chỉ cho tài liệu chính tải.
+ * @returns {Promise<{ buffer: Buffer, blocked: number }>}
  */
 function printHtml(options = {}) {
   let opts;
@@ -223,16 +285,19 @@ function printHtml(options = {}) {
 
     const task = async () => {
       if (settled) return;
-      win = createPrintWindow();
-      const current = win;
+      let current = null;
       try {
+        // Tạo cửa sổ/session cũng có thể ném lỗi; phải nằm trong try để
+        // promise kết thúc và hàng đợi in không bị treo.
+        current = createPrintWindow();
+        win = current;
         await loadHtml(current, opts.filePath, signal);
         if (settled) return;
         await settleDocument(current, signal);
         if (settled) return;
         const data = await renderPdf(current, opts, signal);
         if (settled) return;
-        finish(null, data);
+        finish(null, { buffer: data, blocked: blockedCount(current) });
       } catch (e) {
         finish(signal?.aborted ? cancelled() : (e instanceof ToolError ? e : printFailed()));
       } finally {

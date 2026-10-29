@@ -247,8 +247,9 @@ function createWindow() {
   loadEntry(startEntry());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', e => e.preventDefault());
-  // Worker render là cửa sổ ẩn duy nhất ngoài win; đóng win phải dọn nó và
-  // thoát hẳn — window-all-closed không tự phát khi worker bị destroy sau đó.
+  // Worker render, worker ảnh và cửa sổ in HTML đều là cửa sổ ẩn ngoài win;
+  // đóng win phải dọn hết rồi thoát hẳn — window-all-closed không tự phát khi
+  // các cửa sổ ẩn bị destroy sau đó.
   win.on('closed', () => {
     win = null;
     destroyRenderWorker();
