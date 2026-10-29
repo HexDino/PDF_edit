@@ -4,6 +4,7 @@ const { pagesTool } = require('./pdfops/pageops');
 const { organizeTool } = require('./pdfops/reorder');
 const { cropTool } = require('./pdfops/crop');
 const { pdfImages } = require('./pdfops/convert');
+const { imagesTool } = require('./pdfops/images-pdf');
 const { protect } = require('./pdfops/security');
 const { unlockTool } = require('./pdfops/unlock');
 const { metadataTool } = require('./pdfops/metadata');
@@ -39,7 +40,11 @@ const TOOLS = [
     { key: 'format', type: 'enum', values: ['jpg', 'png'], labels: { jpg: 'JPG — nhẹ hơn', png: 'PNG — nét hơn' }, default: 'jpg', label: 'Định dạng' },
     { key: 'quality', type: 'int', min: 60, max: 100, default: 90, label: 'Chất lượng JPEG (%)' },
   ], run: pdfImages },
-  { id: 'images-pdf', group: 'convert', title: 'Ảnh → PDF', description: 'Ghép ảnh thành một PDF theo thứ tự.', icon: '🖼', accept: ['.png', '.jpg', '.jpeg'], multiple: true, minFiles: 1, status: 'planned', options: [] },
+  { id: 'images-pdf', group: 'convert', title: 'Ảnh → PDF', description: 'Ghép ảnh thành một PDF theo thứ tự.', icon: '🖼', accept: ['.png', '.jpg', '.jpeg', '.webp'], multiple: true, minFiles: 1, status: 'available', options: [
+    { key: 'pageSize', type: 'enum', values: ['auto', 'A4', 'A3', 'Letter'], labels: { auto: 'Tự động', A4: 'A4', A3: 'A3', Letter: 'Letter' }, default: 'A4', label: 'Khổ giấy' },
+    { key: 'orientation', type: 'enum', values: ['auto', 'portrait', 'landscape'], labels: { auto: 'Tự động', portrait: 'Dọc', landscape: 'Ngang' }, default: 'auto', label: 'Hướng trang' },
+    { key: 'margin', type: 'int', min: 0, max: 50, default: 10, label: 'Lề (mm)' },
+  ], run: imagesTool },
   { id: 'html-pdf', group: 'convert', title: 'HTML → PDF', description: 'In file HTML local thành PDF.', icon: '⟨/⟩', accept: ['.html', '.htm'], multiple: false, status: 'planned', options: [] },
   { id: 'compress', group: 'optimize', title: 'Nén PDF', description: 'Giảm dung lượng, có cảnh báo mất lớp chữ.', icon: '🗜', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'protect', group: 'security', title: 'Khoá PDF', description: 'Đặt mật khẩu mở/chủ và hạn chế quyền.', icon: '🔒', accept: ['.pdf'], multiple: false, status: 'available', options: [

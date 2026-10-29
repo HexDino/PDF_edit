@@ -9,6 +9,7 @@ const { binaryPath } = require('./suite/util/paths');
 const { runProcess, killAllChildren } = require('./suite/util/spawn');
 const { createLogger } = require('./suite/util/log');
 const { registerRenderProtocol, pdfToImages, destroyRenderWorker } = require('./suite/render-worker');
+const { registerImageProtocol, imageToPng, destroyImageWorker } = require('./suite/image-worker');
 
 const RENDERER = path.join(__dirname, 'renderer');
 // Tên nội bộ ASCII: tên có dấu lọt vào User-Agent làm hỏng mọi yêu cầu tải tài nguyên
@@ -18,6 +19,7 @@ app.setPath('userData', path.join(app.getPath('appData'), 'TrinhSuaPDF'));
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
   { scheme: 'pdfsrc', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  { scheme: 'imgsrc', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
 
 let win = null;
@@ -137,6 +139,7 @@ else {
       } catch { return new Response('not found', { status: 404 }); }
     });
     registerRenderProtocol();
+    registerImageProtocol();
     let healthCache = null;
     ipcMain.handle('suite:tools', guarded(() => listTools()));
     ipcMain.handle('suite:health', guarded(async () => {
@@ -190,6 +193,7 @@ else {
       tempRoot: path.join(app.getPath('temp'), 'TrinhSuaPDF', 'jobs'),
       log,
       render: { pdfToImages },
+      image: { toPng: imageToPng },
       onEvent: ev => { if (win && !win.isDestroyed()) win.webContents.send('suite:job-event', ev); },
     });
     ipcMain.handle('suite:job-start', (event, req) => {
@@ -207,7 +211,7 @@ else {
   });
   app.on('window-all-closed', () => app.quit());
   // Dừng qpdf/tiến trình con còn sống trước khi thoát (không để orphan trên Windows).
-  app.on('before-quit', () => { quitting = true; destroyRenderWorker(); killAllChildren(); });
+  app.on('before-quit', () => { quitting = true; destroyRenderWorker(); destroyImageWorker(); killAllChildren(); });
 }
 
 function startEntry() {
@@ -246,6 +250,7 @@ function createWindow() {
   win.on('closed', () => {
     win = null;
     destroyRenderWorker();
+    destroyImageWorker();
     if (!quitting) app.quit();
   });
   win.on('close', e => {

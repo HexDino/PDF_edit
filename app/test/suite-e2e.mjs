@@ -8,11 +8,32 @@ import { APP_ROOT, OUT, electronBin, electronEnv, closeApp } from './_paths.mjs'
 const require = createRequire(import.meta.url);
 const { runProcess } = require('../suite/util/spawn.js');
 const { binaryPath } = require('../suite/util/paths.js');
+const { PDFName } = require('pdf-lib');
 const qpdf = (args, opts = {}) =>
   runProcess(binaryPath('qpdf.exe', { appRoot: APP_ROOT, isPackaged: false }), args, opts);
 
 const OUT_LABEL_DEFAULT = 'Cùng thư mục file gốc';
 const screenshotPath = path.join(OUT, 'suite-home.png');
+const PNG_60x90 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAADwAAABaCAIAAABrM6JiAAAAqElEQVR4nNXOMREAIBDAsFIhzPhXgSw8/MI1CrLuPtRIkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkARJkAT5OzDxAL8tAcI6DFvWAAAAAElFTkSuQmCC',
+  'base64',
+);
+const nearPt = (actual, expected, label, tolerance = 0.01) =>
+  assert.ok(Math.abs(actual - expected) < tolerance, `${label}: mong đợi ${expected}, nhận ${actual}`);
+const pageImageSize = (doc, page) => {
+  const resources = page.node.Resources();
+  const xobjects = resources && resources.lookup(PDFName.of('XObject'));
+  if (!xobjects) return null;
+  for (const [, ref] of xobjects.entries()) {
+    const stream = doc.context.lookup(ref);
+    const dict = stream && stream.dict;
+    if (!dict) continue;
+    const width = dict.get(PDFName.of('Width'));
+    const height = dict.get(PDFName.of('Height'));
+    if (width && height) return { width: width.asNumber(), height: height.asNumber() };
+  }
+  return null;
+};
 const cardIds = w => w.$$eval('#toolGrid .card', els => els.map(el => el.dataset.toolId));
 const pngSize = buf => {
   assert.deepEqual([...buf.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 'PNG signature');
@@ -39,21 +60,21 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 9);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 5);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 5);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 10);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 4);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 4);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'protect', 'unlock', 'metadata'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'protect', 'unlock', 'metadata'],
   );
-  console.log('home: 14 thẻ · 9 bật (merge, split, pages, organize, crop, pdf-images, protect, unlock, metadata) · 5 tắt · 5 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 10 bật (merge, split, pages, organize, crop, pdf-images, images-pdf, protect, unlock, metadata) · 4 tắt · 4 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
   await w.waitForFunction(() => document.querySelectorAll('#toolGrid .card').length === 2);
   assert.deepEqual(await cardIds(w), ['merge', 'images-pdf']);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 1);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 0);
   assert.equal(await w.locator('#noResults').isVisible(), false);
   console.log('search “ghép”: 2 thẻ (merge, images-pdf)');
 
@@ -466,6 +487,126 @@ try {
   assert.equal(path.basename(retryRes.outputs[0].path), 'm1b-many-01.png');
   assert.deepEqual(pngSize(fs.readFileSync(retryRes.outputs[0].path)), { width: 600, height: 800 });
   console.log('pdf-images retry ok:', retryRes.outputs[0].path);
+
+  // 10e. Ảnh → PDF: JPG + PNG thành 2 trang A4 dọc, giữ đúng thứ tự.
+  const imagesOut = path.join(OUT, 'm2-images-out');
+  fs.rmSync(imagesOut, { recursive: true, force: true });
+  fs.mkdirSync(imagesOut, { recursive: true });
+  const imagesJpg = path.join(OUT, 'm2-photo.jpg');
+  const imagesPng = path.join(OUT, 'm2-tall.png');
+  fs.copyFileSync(path.join(APP_ROOT, 'test', 'sig-photo.jpg'), imagesJpg);
+  fs.writeFileSync(imagesPng, PNG_60x90);
+
+  await w.evaluate(() => window.__suite.openTool('images-pdf'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'images-pdf');
+  const imageUi = await w.evaluate(() => ({
+    selects: [...document.querySelectorAll('#options select')].map(s => s.value),
+    margin: document.querySelector('#options input[type="number"]').value,
+    accept: window.__suite.state.tool.accept,
+    multiple: window.__suite.state.tool.multiple,
+  }));
+  assert.deepEqual(imageUi.selects, ['A4', 'auto']);
+  assert.equal(imageUi.margin, '10');
+  assert.deepEqual(imageUi.accept, ['.png', '.jpg', '.jpeg', '.webp']);
+  assert.equal(imageUi.multiple, true);
+
+  await w.evaluate(({ files, out }) => window.api.suite.registerInput([...files, out]), {
+    files: [imagesJpg, imagesPng], out: imagesOut,
+  });
+  await w.evaluate(({ files, out }) => {
+    window.__suite.addFiles(files);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pageSize: 'A4', orientation: 'portrait', margin: 10 });
+  }, { files: [imagesJpg, imagesPng], out: imagesOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const imagesRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('images-pdf result:', JSON.stringify(imagesRes));
+  if (!imagesRes?.outputs?.length) throw new Error('Ảnh → PDF không tạo output: ' + JSON.stringify(imagesRes));
+  assert.equal(imagesRes.outputs.length, 1);
+  const imagesFile = imagesRes.outputs[0].path;
+  assert.equal(path.basename(imagesFile), 'm2-photo-anh.pdf');
+  assert.equal(path.dirname(path.resolve(imagesFile)), path.resolve(imagesOut));
+  const imagesDoc = await PDFDocument.load(fs.readFileSync(imagesFile));
+  assert.equal(imagesDoc.getPageCount(), 2);
+  for (const page of imagesDoc.getPages()) {
+    nearPt(page.getWidth(), 595.28, 'A4 rộng');
+    nearPt(page.getHeight(), 841.89, 'A4 cao');
+  }
+  assert.deepEqual(imagesDoc.getPages().map(p => pageImageSize(imagesDoc, p)), [
+    { width: 1200, height: 600 },
+    { width: 60, height: 90 },
+  ]);
+  await qpdf(['--check', imagesFile]);
+  console.log('images-pdf ok:', path.basename(imagesFile), '· 2 trang A4 · đúng thứ tự JPG, PNG');
+
+  // Chạy lại cùng thư mục: không ghi đè, nhận tên (2), file đầu giữ nguyên.
+  const firstImagesBytes = fs.readFileSync(imagesFile);
+  await w.click('#runBtn');
+  const againRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('images-pdf again result:', JSON.stringify(againRes));
+  if (!againRes?.outputs?.length) throw new Error('Ảnh → PDF lần hai không tạo output');
+  assert.equal(path.basename(againRes.outputs[0].path), 'm2-photo-anh (2).pdf');
+  assert.deepEqual(fs.readFileSync(imagesFile), firstImagesBytes, 'file đầu phải giữ nguyên');
+  console.log('images-pdf no-overwrite ok:', path.basename(againRes.outputs[0].path));
+
+  // 10f. WebP: worker ẩn giải mã bằng canvas rồi nhúng PNG; khổ auto = ảnh + lề.
+  const webpOut = path.join(OUT, 'm2-images-webp-out');
+  fs.rmSync(webpOut, { recursive: true, force: true });
+  fs.mkdirSync(webpOut, { recursive: true });
+  const webpSrc = path.join(OUT, 'm2-photo.webp');
+  fs.copyFileSync(path.join(APP_ROOT, 'test', 'tiny.webp'), webpSrc);
+
+  await w.evaluate(() => window.__suite.openTool('images-pdf'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'images-pdf');
+  // Hash không đổi nên openTool không tự reset danh sách file của lần chạy trước.
+  await w.evaluate(() => {
+    window.__suite.state.files = [];
+    window.__suite.state.outputDir = null;
+  });
+  await w.evaluate(({ files, out }) => window.api.suite.registerInput([...files, out]), {
+    files: [webpSrc], out: webpOut,
+  });
+  await w.evaluate(({ files, out }) => {
+    window.__suite.addFiles(files);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pageSize: 'auto', orientation: 'auto', margin: 5 });
+  }, { files: [webpSrc], out: webpOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const webpRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('images-pdf webp result:', JSON.stringify(webpRes));
+  if (!webpRes?.outputs?.length) throw new Error('WebP → PDF không tạo output: ' + JSON.stringify(webpRes));
+  assert.equal(path.basename(webpRes.outputs[0].path), 'm2-photo-anh.pdf');
+  const webpDoc = await PDFDocument.load(fs.readFileSync(webpRes.outputs[0].path));
+  assert.equal(webpDoc.getPageCount(), 1);
+  const mm5 = 5 * 72 / 25.4;
+  nearPt(webpDoc.getPage(0).getWidth(), 37 + 2 * mm5, 'WebP auto rộng');
+  nearPt(webpDoc.getPage(0).getHeight(), 23 + 2 * mm5, 'WebP auto cao');
+  assert.deepEqual(pageImageSize(webpDoc, webpDoc.getPage(0)), { width: 37, height: 23 });
+  console.log('images-pdf webp ok:', path.basename(webpRes.outputs[0].path), '· 37×23 px + lề 5 mm');
+
+  // 10g. WebP hỏng: worker báo lỗi, job nhận INVALID_FILE và không tạo PDF.
+  const badWebp = path.join(OUT, 'm2-bad.webp');
+  fs.writeFileSync(badWebp, 'không phải WebP');
+  await w.evaluate(() => {
+    window.__suite.state.files = [];
+    window.__suite.state.outputDir = null;
+  });
+  await w.evaluate(({ files, out }) => window.api.suite.registerInput([...files, out]), {
+    files: [badWebp], out: webpOut,
+  });
+  await w.evaluate(({ files, out }) => {
+    window.__suite.addFiles(files);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pageSize: 'A4', orientation: 'auto', margin: 10 });
+  }, { files: [badWebp], out: webpOut });
+  await w.click('#runBtn');
+  const badRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('images-pdf bad webp result:', JSON.stringify(badRes));
+  assert.equal(badRes?.code, 'INVALID_FILE');
+  assert.equal(fs.existsSync(path.join(webpOut, 'm2-bad-anh.pdf')), false);
+  console.log('images-pdf bad webp ok: INVALID_FILE · không tạo PDF');
 
   // 11. Khoá PDF: qpdf thật mã hoá AES-256; mật khẩu đúng mở được, sai bị từ chối.
   const protectOut = path.join(OUT, 'm1b-protect-out');

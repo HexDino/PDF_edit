@@ -15,11 +15,12 @@ const PROGRESS_THROTTLE_MS = 100;
 const STALE_JOB_AGE_MS = 60 * 60 * 1000;
 
 class JobRunner {
-  constructor({ tools, onEvent, qpdfPath, tempRoot, concurrency = 2, log = () => {}, render = null, staleJobMaxAgeMs = STALE_JOB_AGE_MS }) {
+  constructor({ tools, onEvent, qpdfPath, tempRoot, concurrency = 2, log = () => {}, render = null, image = null, staleJobMaxAgeMs = STALE_JOB_AGE_MS }) {
     this.tools = new Map(tools.map(t => [t.id, t]));
     this.onEvent = onEvent;
     this.qpdfPath = qpdfPath;
     this.render = render;
+    this.image = image;
     this.tempRoot = tempRoot || path.join(os.tmpdir(), 'TrinhSuaPDF', 'jobs');
     this.concurrency = concurrency;
     this.log = log;
@@ -142,6 +143,10 @@ class JobRunner {
         progress: (phase, current, total, message) => this.#progress(job, { phase, current, total, message }),
         qpdf: (args, opts = {}) => runProcess(this.qpdfPath, args, { ...opts, signal: job.controller.signal }),
         render: this.render,
+        // Ảnh tạm luôn nằm trong thư mục job và luôn dùng signal của job.
+        image: this.image ? {
+          toPng: filePath => this.image.toPng(filePath, { outDir: tempDir, signal: job.controller.signal }),
+        } : null,
       };
       ctx.progress('reading', 0, 1, 'Đang đọc file…');
       const result = await this.#runTool(job, ctx);

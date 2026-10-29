@@ -17,13 +17,15 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('merge/split/pages/organize/crop/protect/unlock/metadata khả dụng, 5 công cụ đang chờ', () => {
+test('10 công cụ khả dụng, 4 công cụ đang chờ', () => {
   const tools = listTools();
-  for (const id of ['merge', 'split', 'pages', 'organize', 'crop', 'protect', 'unlock', 'metadata']) {
+  for (const id of [
+    'merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'protect', 'unlock', 'metadata',
+  ]) {
     assert.equal(tools.find(t => t.id === id).status, 'available');
   }
-  assert.equal(tools.filter(t => t.status === 'available').length, 9);
-  assert.equal(tools.filter(t => t.status === 'planned').length, 5);
+  assert.equal(tools.filter(t => t.status === 'available').length, 10);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 4);
 });
 test('split/pages có đủ tuỳ chọn cho UI', () => {
   const tools = listTools();
@@ -86,6 +88,24 @@ test('metadata khả dụng với ba tuỳ chọn bật mặc định', () => {
     assert.equal(option(key).default, true);
     assert.match(option(key).label, label);
   }
+});
+test('images-pdf nhận nhiều ảnh, có khổ/hướng/lề', () => {
+  const tool = listTools().find(t => t.id === 'images-pdf');
+  assert.equal(tool.status, 'available');
+  assert.equal(tool.multiple, true);
+  assert.equal(tool.minFiles, 1);
+  assert.deepEqual(tool.accept, ['.png', '.jpg', '.jpeg', '.webp']);
+  const option = key => tool.options.find(o => o.key === key);
+  assert.equal(option('pageSize').type, 'enum');
+  assert.deepEqual(option('pageSize').values, ['auto', 'A4', 'A3', 'Letter']);
+  assert.equal(option('pageSize').default, 'A4');
+  assert.equal(option('orientation').type, 'enum');
+  assert.deepEqual(option('orientation').values, ['auto', 'portrait', 'landscape']);
+  assert.equal(option('orientation').default, 'auto');
+  assert.equal(option('margin').type, 'int');
+  assert.deepEqual([option('margin').min, option('margin').max], [0, 50]);
+  assert.equal(option('margin').default, 10);
+  assert.match(option('margin').label, /mm/);
 });
 test('không lộ hàm run qua IPC', () => {
   for (const t of listTools()) assert.equal(t.run, undefined);
