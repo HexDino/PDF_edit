@@ -17,15 +17,15 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('10 công cụ khả dụng, 4 công cụ đang chờ', () => {
+test('11 công cụ khả dụng, 3 công cụ đang chờ', () => {
   const tools = listTools();
   for (const id of [
-    'merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'protect', 'unlock', 'metadata',
+    'merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata',
   ]) {
     assert.equal(tools.find(t => t.id === id).status, 'available');
   }
-  assert.equal(tools.filter(t => t.status === 'available').length, 10);
-  assert.equal(tools.filter(t => t.status === 'planned').length, 4);
+  assert.equal(tools.filter(t => t.status === 'available').length, 11);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 3);
 });
 test('split/pages có đủ tuỳ chọn cho UI', () => {
   const tools = listTools();
@@ -102,6 +102,24 @@ test('images-pdf nhận nhiều ảnh, có khổ/hướng/lề', () => {
   assert.equal(option('orientation').type, 'enum');
   assert.deepEqual(option('orientation').values, ['auto', 'portrait', 'landscape']);
   assert.equal(option('orientation').default, 'auto');
+  assert.equal(option('margin').type, 'int');
+  assert.deepEqual([option('margin').min, option('margin').max], [0, 50]);
+  assert.equal(option('margin').default, 10);
+  assert.match(option('margin').label, /mm/);
+});
+test('html-pdf nhận một file .html/.htm, có khổ/ngang/nền/lề', () => {
+  const tool = listTools().find(t => t.id === 'html-pdf');
+  assert.equal(tool.status, 'available');
+  assert.equal(tool.multiple, false);
+  assert.deepEqual(tool.accept, ['.html', '.htm']);
+  const option = key => tool.options.find(o => o.key === key);
+  assert.equal(option('pageSize').type, 'enum');
+  assert.deepEqual(option('pageSize').values, ['A4', 'A3', 'Letter']);
+  assert.equal(option('pageSize').default, 'A4');
+  assert.equal(option('landscape').type, 'bool');
+  assert.equal(option('landscape').default, false);
+  assert.equal(option('printBackground').type, 'bool');
+  assert.equal(option('printBackground').default, true);
   assert.equal(option('margin').type, 'int');
   assert.deepEqual([option('margin').min, option('margin').max], [0, 50]);
   assert.equal(option('margin').default, 10);

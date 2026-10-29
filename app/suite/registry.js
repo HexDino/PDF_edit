@@ -5,6 +5,7 @@ const { organizeTool } = require('./pdfops/reorder');
 const { cropTool } = require('./pdfops/crop');
 const { pdfImages } = require('./pdfops/convert');
 const { imagesTool } = require('./pdfops/images-pdf');
+const { htmlTool } = require('./pdfops/html-pdf');
 const { protect } = require('./pdfops/security');
 const { unlockTool } = require('./pdfops/unlock');
 const { metadataTool } = require('./pdfops/metadata');
@@ -45,7 +46,12 @@ const TOOLS = [
     { key: 'orientation', type: 'enum', values: ['auto', 'portrait', 'landscape'], labels: { auto: 'Tự động', portrait: 'Dọc', landscape: 'Ngang' }, default: 'auto', label: 'Hướng trang' },
     { key: 'margin', type: 'int', min: 0, max: 50, default: 10, label: 'Lề (mm)' },
   ], run: imagesTool },
-  { id: 'html-pdf', group: 'convert', title: 'HTML → PDF', description: 'In file HTML local thành PDF.', icon: '⟨/⟩', accept: ['.html', '.htm'], multiple: false, status: 'planned', options: [] },
+  { id: 'html-pdf', group: 'convert', title: 'HTML → PDF', description: 'In file HTML local thành PDF.', icon: '⟨/⟩', accept: ['.html', '.htm'], multiple: false, status: 'available', options: [
+    { key: 'pageSize', type: 'enum', values: ['A4', 'A3', 'Letter'], labels: { A4: 'A4', A3: 'A3', Letter: 'Letter' }, default: 'A4', label: 'Khổ giấy' },
+    { key: 'landscape', type: 'bool', default: false, label: 'Trang ngang', hint: 'Bật' },
+    { key: 'printBackground', type: 'bool', default: true, label: 'In nền và màu', hint: 'Bật' },
+    { key: 'margin', type: 'int', min: 0, max: 50, default: 10, label: 'Lề (mm)' },
+  ], run: htmlTool },
   { id: 'compress', group: 'optimize', title: 'Nén PDF', description: 'Giảm dung lượng, có cảnh báo mất lớp chữ.', icon: '🗜', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'protect', group: 'security', title: 'Khoá PDF', description: 'Đặt mật khẩu mở/chủ và hạn chế quyền.', icon: '🔒', accept: ['.pdf'], multiple: false, status: 'available', options: [
     { key: 'openPassword', type: 'password', default: '', label: 'Mật khẩu mở (trống = chỉ mở bằng mật khẩu chủ)' },

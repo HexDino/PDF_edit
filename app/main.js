@@ -10,6 +10,7 @@ const { runProcess, killAllChildren } = require('./suite/util/spawn');
 const { createLogger } = require('./suite/util/log');
 const { registerRenderProtocol, pdfToImages, destroyRenderWorker } = require('./suite/render-worker');
 const { registerImageProtocol, imageToPng, destroyImageWorker } = require('./suite/image-worker');
+const { printHtml, destroyHtmlPrinter } = require('./suite/html-printer');
 
 const RENDERER = path.join(__dirname, 'renderer');
 // Tên nội bộ ASCII: tên có dấu lọt vào User-Agent làm hỏng mọi yêu cầu tải tài nguyên
@@ -194,6 +195,7 @@ else {
       log,
       render: { pdfToImages },
       image: { toPng: imageToPng },
+      printHtml,
       onEvent: ev => { if (win && !win.isDestroyed()) win.webContents.send('suite:job-event', ev); },
     });
     ipcMain.handle('suite:job-start', (event, req) => {
@@ -211,7 +213,7 @@ else {
   });
   app.on('window-all-closed', () => app.quit());
   // Dừng qpdf/tiến trình con còn sống trước khi thoát (không để orphan trên Windows).
-  app.on('before-quit', () => { quitting = true; destroyRenderWorker(); destroyImageWorker(); killAllChildren(); });
+  app.on('before-quit', () => { quitting = true; destroyRenderWorker(); destroyImageWorker(); destroyHtmlPrinter(); killAllChildren(); });
 }
 
 function startEntry() {
@@ -251,6 +253,7 @@ function createWindow() {
     win = null;
     destroyRenderWorker();
     destroyImageWorker();
+    destroyHtmlPrinter();
     if (!quitting) app.quit();
   });
   win.on('close', e => {

@@ -1,6 +1,7 @@
 import { _electron as electron } from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'fs';
+import http from 'node:http';
 import path from 'path';
 import { createRequire } from 'node:module';
 import { APP_ROOT, OUT, electronBin, electronEnv, closeApp } from './_paths.mjs';
@@ -48,6 +49,8 @@ const app = await electron.launch({
   env: { ...electronEnv, TSP_SUITE: '1' },
 });
 
+let remote = null;
+
 try {
   const w = await app.firstWindow();
   await w.setViewportSize({ width: 1500, height: 1100 }).catch(() => {});
@@ -60,15 +63,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 10);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 4);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 4);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 11);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 3);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 3);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'protect', 'unlock', 'metadata'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata'],
   );
-  console.log('home: 14 thẻ · 10 bật (merge, split, pages, organize, crop, pdf-images, images-pdf, protect, unlock, metadata) · 4 tắt · 4 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 11 bật (merge, split, pages, organize, crop, pdf-images, images-pdf, html-pdf, protect, unlock, metadata) · 3 tắt · 3 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -608,6 +611,123 @@ try {
   assert.equal(fs.existsSync(path.join(webpOut, 'm2-bad-anh.pdf')), false);
   console.log('images-pdf bad webp ok: INVALID_FILE · không tạo PDF');
 
+  // 10h. HTML → PDF: in file local bằng cửa sổ ẩn; ảnh remote trong HTML
+  // không được phát sinh request mạng nào.
+  const htmlOut = path.join(OUT, 'm2-html-out');
+  fs.rmSync(htmlOut, { recursive: true, force: true });
+  fs.mkdirSync(htmlOut, { recursive: true });
+
+  let remoteHits = 0;
+  remote = http.createServer((_req, res) => {
+    remoteHits += 1;
+    res.setHeader('content-type', 'image/png');
+    res.end(PNG_60x90);
+  });
+  await new Promise(resolve => remote.listen(0, '127.0.0.1', resolve));
+  const remotePort = remote.address().port;
+  // Chứng minh server có thể nhận request, sau đó đặt lại bộ đếm.
+  await new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${remotePort}/probe.png`, res => { res.resume(); res.on('end', resolve); })
+      .on('error', reject);
+  });
+  assert.equal(remoteHits, 1, 'server kiểm tra phải nhận được request');
+  remoteHits = 0;
+
+  const htmlSrc = path.join(OUT, 'm2-page.html');
+  fs.writeFileSync(htmlSrc, `<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Trang in thử</title>
+<style>
+  body { margin: 0; font-family: Arial, sans-serif; background: #eef4ff; color: #123a6b; }
+  .box { padding: 24px; }
+  h1 { font-size: 34px; margin: 0 0 12px; }
+  p { font-size: 15px; line-height: 1.5; }
+</style></head>
+<body><div class="box"><h1>HÓA ĐƠN HTML</h1><p>Nội dung in từ file HTML local.</p>
+<img src="http://127.0.0.1:${remotePort}/remote.png" alt="ảnh mạng" width="40" height="60">
+</div></body></html>`);
+
+  await w.evaluate(() => window.__suite.openTool('html-pdf'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'html-pdf');
+  const htmlUi = await w.evaluate(() => ({
+    selects: [...document.querySelectorAll('#options select')].map(s => s.value),
+    checks: [...document.querySelectorAll('#options input[type="checkbox"]')].map(c => c.checked),
+    margin: document.querySelector('#options input[type="number"]').value,
+    accept: window.__suite.state.tool.accept,
+    multiple: window.__suite.state.tool.multiple,
+  }));
+  assert.deepEqual(htmlUi.selects, ['A4']);
+  assert.deepEqual(htmlUi.checks, [false, true]);
+  assert.equal(htmlUi.margin, '10');
+  assert.deepEqual(htmlUi.accept, ['.html', '.htm']);
+  assert.equal(htmlUi.multiple, false);
+
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: htmlSrc, out: htmlOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pageSize: 'A4', landscape: false, printBackground: true, margin: 10 });
+  }, { file: htmlSrc, out: htmlOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const htmlRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('html-pdf result:', JSON.stringify(htmlRes));
+  if (!htmlRes?.outputs?.length) throw new Error('HTML → PDF không tạo output: ' + JSON.stringify(htmlRes));
+  assert.equal(htmlRes.outputs.length, 1);
+  const htmlFile = htmlRes.outputs[0].path;
+  assert.equal(path.basename(htmlFile), 'm2-page-html.pdf');
+  assert.equal(path.dirname(path.resolve(htmlFile)), path.resolve(htmlOut));
+  assert.ok(fs.statSync(htmlFile).size > 0, 'PDF từ HTML phải có dữ liệu');
+  const htmlDoc = await PDFDocument.load(fs.readFileSync(htmlFile));
+  assert.ok(htmlDoc.getPageCount() >= 1, 'PDF từ HTML phải có ít nhất 1 trang');
+  for (const page of htmlDoc.getPages()) {
+    nearPt(page.getWidth(), 595.28, 'HTML A4 rộng', 2);
+    nearPt(page.getHeight(), 841.89, 'HTML A4 cao', 2);
+  }
+  await qpdf(['--check', htmlFile]);
+  // QDF cho thấy font nhúng và toán tử hiện chữ — nội dung đã được vẽ thật.
+  const qdf = await qpdf(['--qdf', '--object-streams=disable', htmlFile, '-']);
+  assert.match(qdf.stdout, /\/Type \/Font/, 'PDF phải nhúng font');
+  assert.match(qdf.stdout, /\b(Tj|TJ)\b/, 'PDF phải có toán tử hiện chữ');
+  await new Promise(r => setTimeout(r, 200));
+  assert.equal(remoteHits, 0, 'cửa sổ in không được phát sinh request mạng');
+  console.log('html-pdf ok:', path.basename(htmlFile), '· A4 · font/chữ có trong PDF · chặn mạng');
+
+  // Chạy lại cùng thư mục: không ghi đè, nhận tên (2).
+  const firstHtmlBytes = fs.readFileSync(htmlFile);
+  await w.click('#runBtn');
+  const htmlAgain = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('html-pdf again result:', JSON.stringify(htmlAgain));
+  if (!htmlAgain?.outputs?.length) throw new Error('HTML → PDF lần hai không tạo output');
+  assert.equal(path.basename(htmlAgain.outputs[0].path), 'm2-page-html (2).pdf');
+  assert.deepEqual(fs.readFileSync(htmlFile), firstHtmlBytes, 'file đầu phải giữ nguyên');
+  console.log('html-pdf no-overwrite ok:', path.basename(htmlAgain.outputs[0].path));
+
+  // A3 ngang, không in nền, lề 0.
+  await w.evaluate(() => {
+    window.__suite.state.files = [];
+    window.__suite.state.outputDir = null;
+  });
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: htmlSrc, out: htmlOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pageSize: 'A3', landscape: true, printBackground: false, margin: 0 });
+  }, { file: htmlSrc, out: htmlOut });
+  await w.click('#runBtn');
+  const htmlA3 = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('html-pdf A3 result:', JSON.stringify(htmlA3));
+  if (!htmlA3?.outputs?.length) throw new Error('HTML → PDF A3 không tạo output');
+  const htmlA3File = htmlA3.outputs[0].path;
+  assert.equal(path.basename(htmlA3File), 'm2-page-html (3).pdf');
+  const a3Doc = await PDFDocument.load(fs.readFileSync(htmlA3File));
+  nearPt(a3Doc.getPage(0).getWidth(), 1190.55, 'A3 ngang rộng', 2);
+  nearPt(a3Doc.getPage(0).getHeight(), 841.89, 'A3 ngang cao', 2);
+  await qpdf(['--check', htmlA3File]);
+  assert.equal(remoteHits, 0, 'lần in A3 cũng không có request mạng');
+  await new Promise(resolve => remote.close(resolve));
+  remote = null;
+  console.log('html-pdf A3 ngang ok:', path.basename(htmlA3File), '· 1191×842 · lề 0 · không nền');
+
   // 11. Khoá PDF: qpdf thật mã hoá AES-256; mật khẩu đúng mở được, sai bị từ chối.
   const protectOut = path.join(OUT, 'm1b-protect-out');
   fs.rmSync(protectOut, { recursive: true, force: true });
@@ -774,5 +894,6 @@ try {
   await qpdf(['--check', metaFile]);
   console.log('metadata ok:', metaFile, '· Info/ngày/khoá tuỳ biến đã xoá hẳn, không còn tệp đính kèm');
 } finally {
+  if (remote) await new Promise(resolve => remote.close(resolve)).catch(() => {});
   await closeApp(app);
 }
