@@ -28,6 +28,19 @@ async function makePdf(file, specs = [[300, 200, 0], [300, 200, 90], [300, 200, 
   fs.writeFileSync(file, await doc.save());
 }
 
+// Trang có MediaBox/CropBox tuỳ ý (gốc khác 0) để kiểm tra crop bám CropBox.
+async function makeBoxedPdf(file, specs) {
+  const doc = await PDFDocument.create();
+  for (const { media, crop, rotation } of specs) {
+    const page = doc.addPage([media.width, media.height]);
+    // addPage luôn đặt MediaBox tại (0,0); đặt lại khi hộp có gốc khác 0.
+    if (media.x || media.y) page.setMediaBox(media.x, media.y, media.width, media.height);
+    if (crop) page.setCropBox(crop.x, crop.y, crop.width, crop.height);
+    if (rotation) page.setRotation(degrees(rotation));
+  }
+  fs.writeFileSync(file, await doc.save());
+}
+
 function ctxFor(file, dir, options = {}, overrides = {}) {
   const tempDir = fs.mkdtempSync(path.join(dir, 'tmp-'));
   return {
@@ -103,6 +116,84 @@ test('crop lề không đều: toạ độ CropBox map đúng qua góc xoay', as
   ];
   for (const [i, page] of pages.entries()) {
     assertBox(page.crop, expected[i], `trang xoay ${i * 90}`);
+  }
+});
+
+test('lề 0 giữ nguyên CropBox có sẵn, chạy lại vẫn bất biến', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'c.pdf');
+  const media = { x: 50, y: 60, width: 300, height: 200 };
+  const crop = { x: 75, y: 95, width: 200, height: 120 };
+  await makeBoxedPdf(file, [0, 90, 180, 270].map(rotation => ({ media, crop, rotation })));
+  const zero = { pages: '' };
+
+  const first = await cropTool(ctxFor(file, dir, zero));
+  assert.equal(path.basename(first.outputs[0].path), 'c-crop.pdf');
+  const pages = await readPages(first.outputs[0].path);
+  assert.equal(pages.length, 4);
+  for (const [i, page] of pages.entries()) {
+    assert.equal(page.rotation, i * 90, `trang ${i + 1} giữ góc xoay`);
+    assertBox(page.crop, crop, `trang ${i + 1} giữ CropBox`);
+    assertBox(page.media, media, `media trang ${i + 1}`);
+  }
+
+  // CropBox đã bằng lề 0 của chính nó nên lần chạy thứ hai không được đổi gì.
+  const second = await cropTool(ctxFor(first.outputs[0].path, dir, zero));
+  const again = await readPages(second.outputs[0].path);
+  for (const [i, page] of again.entries()) {
+    assertBox(page.crop, crop, `trang ${i + 1} sau hai lần chạy`);
+    assertBox(page.media, media, `media trang ${i + 1} sau hai lần chạy`);
+  }
+});
+
+test('crop trên CropBox có sẵn: lề map đúng qua góc xoay 0/90/180/270', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'c.pdf');
+  const media = { x: 50, y: 60, width: 300, height: 200 };
+  const base = { x: 75, y: 95, width: 200, height: 120 };
+  await makeBoxedPdf(file, [0, 90, 180, 270].map(rotation => ({ media, crop: base, rotation })));
+
+  const top = 5 * MM;
+  const right = 10 * MM;
+  const bottom = 20 * MM;
+  const left = 15 * MM;
+  const r = await cropTool(ctxFor(file, dir, { top: 5, right: 10, bottom: 20, left: 15, pages: '' }));
+  const pages = await readPages(r.outputs[0].path);
+
+  // Cùng bảng map với trang không có CropBox, nhưng gốc/kích thước lấy từ CropBox.
+  const expected = [
+    { x: base.x + left, y: base.y + bottom, width: base.width - left - right, height: base.height - bottom - top },
+    { x: base.x + top, y: base.y + left, width: base.width - top - bottom, height: base.height - left - right },
+    { x: base.x + right, y: base.y + top, width: base.width - right - left, height: base.height - top - bottom },
+    { x: base.x + bottom, y: base.y + right, width: base.width - bottom - top, height: base.height - right - left },
+  ];
+  for (const [i, page] of pages.entries()) {
+    assert.equal(page.rotation, i * 90, `trang ${i + 1} giữ góc xoay`);
+    assertBox(page.crop, expected[i], `trang xoay ${i * 90}`);
+    assertBox(page.media, media, `media trang xoay ${i * 90}`);
+  }
+});
+
+test('MediaBox có gốc khác 0: lề tính từ gốc MediaBox khi chưa có CropBox', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'c.pdf');
+  const media = { x: 50, y: 60, width: 300, height: 200 };
+  await makeBoxedPdf(file, [{ media, rotation: 0 }, { media, rotation: 90 }]);
+
+  const top = 5 * MM;
+  const right = 10 * MM;
+  const bottom = 20 * MM;
+  const left = 15 * MM;
+  const r = await cropTool(ctxFor(file, dir, { top: 5, right: 10, bottom: 20, left: 15, pages: '' }));
+  const pages = await readPages(r.outputs[0].path);
+
+  const expected = [
+    { x: media.x + left, y: media.y + bottom, width: media.width - left - right, height: media.height - bottom - top },
+    { x: media.x + top, y: media.y + left, width: media.width - top - bottom, height: media.height - left - right },
+  ];
+  for (const [i, page] of pages.entries()) {
+    assertBox(page.crop, expected[i], `trang xoay ${i * 90}`);
+    assertBox(page.media, media, `media trang xoay ${i * 90}`);
   }
 });
 

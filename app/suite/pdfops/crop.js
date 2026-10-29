@@ -93,8 +93,10 @@ async function cropTool(ctx) {
   for (let i = 0; i < pageCount; i++) {
     if (!selected.has(i + 1)) continue;
     const page = doc.getPage(i);
-    const crop = cropBoxFor(page, page.getMediaBox(), margins, i + 1);
-    // Chỉ đặt CropBox; MediaBox và góc xoay của trang giữ nguyên.
+    // Bám theo CropBox hiện có (bằng MediaBox khi trang chưa đặt CropBox) để
+    // không mở rộng vùng hiển thị; nhờ vậy lề 0 giữ nguyên CropBox cũ.
+    const crop = cropBoxFor(page, page.getCropBox(), margins, i + 1);
+    // Chỉ đặt CropBox; MediaBox, góc xoay và các hộp Trim/Bleed/Art giữ nguyên.
     page.setCropBox(crop.x, crop.y, crop.width, crop.height);
   }
   ctx.signal.throwIfAborted();
