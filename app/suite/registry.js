@@ -1,6 +1,8 @@
 const { merge } = require('./pdfops/organize');
 const { splitPdf } = require('./pdfops/split');
 const { pagesTool } = require('./pdfops/pageops');
+const { organizeTool } = require('./pdfops/reorder');
+const { cropTool } = require('./pdfops/crop');
 const { pdfImages } = require('./pdfops/convert');
 const { protect } = require('./pdfops/security');
 
@@ -15,8 +17,18 @@ const TOOLS = [
     { key: 'mode', type: 'enum', values: ['delete', 'extract'], labels: { delete: 'Xoá trang', extract: 'Trích trang' }, default: 'extract', label: 'Chế độ' },
     { key: 'pages', type: 'range', label: 'Khoảng trang', placeholder: '1-3,5 (bắt buộc khi xoá)' },
   ], run: pagesTool },
-  { id: 'organize', group: 'organize', title: 'Tổ chức trang', description: 'Đổi thứ tự, xoay, nhân bản, chèn trang trắng.', icon: '⇅', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
-  { id: 'crop', group: 'organize', title: 'Crop PDF', description: 'Cắt lề trang theo khung tuỳ chọn.', icon: '⌗', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
+  { id: 'organize', group: 'organize', title: 'Tổ chức trang', description: 'Đổi thứ tự, xoay, nhân bản, chèn trang trắng.', icon: '⇅', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'order', type: 'text', default: '', label: 'Thứ tự trang', placeholder: '3,1,2 (trống = giữ nguyên)' },
+    { key: 'rotate', type: 'enum', values: ['0', '90', '180', '270'], default: '0', label: 'Xoay tất cả trang' },
+    { key: 'blankCount', type: 'int', min: 0, max: 50, default: 0, label: 'Số trang trắng thêm cuối' },
+  ], run: organizeTool },
+  { id: 'crop', group: 'organize', title: 'Crop PDF', description: 'Cắt lề trang theo khung tuỳ chọn.', icon: '⌗', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'top', type: 'int', min: 0, max: 200, default: 0, label: 'Lề trên (mm)' },
+    { key: 'right', type: 'int', min: 0, max: 200, default: 0, label: 'Lề phải (mm)' },
+    { key: 'bottom', type: 'int', min: 0, max: 200, default: 0, label: 'Lề dưới (mm)' },
+    { key: 'left', type: 'int', min: 0, max: 200, default: 0, label: 'Lề trái (mm)' },
+    { key: 'pages', type: 'range', label: 'Khoảng trang', placeholder: '1-3,5 (trống = tất cả)' },
+  ], run: cropTool },
   { id: 'stamp', group: 'stamp', title: 'Số trang & header/footer', description: 'Đánh số trang và chèn tiêu đề/chân trang.', icon: '#', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'watermark', group: 'stamp', title: 'Watermark', description: 'Chèn chữ hoặc ảnh mờ lên trang.', icon: '◈', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'pdf-images', group: 'convert', title: 'PDF → ảnh', description: 'Xuất từng trang thành JPG hoặc PNG.', icon: '🖼', accept: ['.pdf'], multiple: false, status: 'available', options: [

@@ -17,12 +17,13 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('merge/split/pages khả dụng, các công cụ khác đang chờ', () => {
+test('merge/split/pages/organize/crop khả dụng, 7 công cụ đang chờ', () => {
   const tools = listTools();
-  assert.equal(tools.find(t => t.id === 'merge').status, 'available');
-  assert.equal(tools.find(t => t.id === 'split').status, 'available');
-  assert.equal(tools.find(t => t.id === 'pages').status, 'available');
-  assert.ok(tools.filter(t => t.status === 'planned').length >= 9);
+  for (const id of ['merge', 'split', 'pages', 'organize', 'crop']) {
+    assert.equal(tools.find(t => t.id === id).status, 'available');
+  }
+  assert.equal(tools.filter(t => t.status === 'available').length, 7);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 7);
 });
 test('split/pages có đủ tuỳ chọn cho UI', () => {
   const tools = listTools();
@@ -36,6 +37,28 @@ test('split/pages có đủ tuỳ chọn cho UI', () => {
   );
   assert.deepEqual(pages.options.find(o => o.key === 'mode').values, ['delete', 'extract']);
   assert.match(pages.options.find(o => o.key === 'pages').placeholder, /bắt buộc khi xoá/);
+});
+test('organize/crop có đủ tuỳ chọn cho UI', () => {
+  const tools = listTools();
+  const organize = tools.find(t => t.id === 'organize');
+  const crop = tools.find(t => t.id === 'crop');
+  const option = (tool, key) => tool.options.find(o => o.key === key);
+
+  assert.equal(option(organize, 'order').type, 'text');
+  assert.equal(option(organize, 'order').placeholder, '3,1,2 (trống = giữ nguyên)');
+  assert.deepEqual(option(organize, 'rotate').values, ['0', '90', '180', '270']);
+  assert.equal(option(organize, 'rotate').default, '0');
+  assert.deepEqual([option(organize, 'blankCount').min, option(organize, 'blankCount').max], [0, 50]);
+  assert.equal(option(organize, 'blankCount').default, 0);
+
+  for (const [key, label] of [['top', 'Lề trên'], ['right', 'Lề phải'], ['bottom', 'Lề dưới'], ['left', 'Lề trái']]) {
+    assert.equal(option(crop, key).type, 'int');
+    assert.deepEqual([option(crop, key).min, option(crop, key).max], [0, 200]);
+    assert.equal(option(crop, key).default, 0);
+    assert.match(option(crop, key).label, new RegExp(`${label} \\(mm\\)`));
+  }
+  assert.equal(option(crop, 'pages').type, 'range');
+  assert.equal(option(crop, 'pages').placeholder, '1-3,5 (trống = tất cả)');
 });
 test('protect nói rõ mật khẩu chủ bắt buộc khi hạn chế quyền', () => {
   const p = listTools().find(t => t.id === 'protect');

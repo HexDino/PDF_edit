@@ -39,15 +39,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 5);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 9);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 9);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 7);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 7);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 7);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'pdf-images', 'protect'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'protect'],
   );
-  console.log('home: 14 thẻ · 5 bật (merge, split, pages, pdf-images, protect) · 9 tắt · 9 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 7 bật (merge, split, pages, organize, crop, pdf-images, protect) · 7 tắt · 7 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -186,7 +186,10 @@ try {
   }
   async function makeSized(file, sizes) {
     const d = await PDFDocument.create();
-    for (const [width, height] of sizes) d.addPage([width, height]);
+    for (const [width, height] of sizes) {
+      // Nội dung nhỏ để phân biệt trang chép sang với trang trắng chèn thêm.
+      d.addPage([width, height]).drawRectangle({ x: 1, y: 1, width: 2, height: 2 });
+    }
     fs.writeFileSync(file, await d.save());
   }
   await make(a, 2); await make(b, 3);
@@ -279,6 +282,73 @@ try {
   assert.equal(pagesDoc.getPageCount(), 2);
   assert.deepEqual(pagesDoc.getPages().map(p => Math.round(p.getWidth())), [102, 104]);
   console.log('pages ok:', path.basename(pagesRes.outputs[0].path), '· 2 trang (2,4)');
+
+  // 9d. Tổ chức trang: 3,1,2 + xoay 90 + 1 trang trắng -> 4 trang.
+  const organizeOut = path.join(OUT, 'm2-organize-out');
+  fs.rmSync(organizeOut, { recursive: true, force: true });
+  fs.mkdirSync(organizeOut, { recursive: true });
+  await w.evaluate(() => window.__suite.openTool('organize'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'organize');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: m2Src, out: organizeOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ order: '3,1,2', rotate: '90', blankCount: 1 });
+  }, { file: m2Src, out: organizeOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const organizeRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('organize result:', JSON.stringify(organizeRes));
+  if (!organizeRes?.outputs?.length) throw new Error('Tổ chức trang không tạo output: ' + JSON.stringify(organizeRes));
+  assert.equal(organizeRes.outputs.length, 1);
+  assert.equal(path.basename(organizeRes.outputs[0].path), 'm2-4pages-to-chuc.pdf');
+  const orgDoc = await PDFDocument.load(fs.readFileSync(organizeRes.outputs[0].path));
+  const orgPages = orgDoc.getPages();
+  assert.equal(orgDoc.getPageCount(), 4);
+  assert.deepEqual(orgPages.map(p => Math.round(p.getWidth())), [103, 101, 102, 102]);
+  assert.deepEqual(
+    orgPages.map(p => ((p.getRotation().angle % 360) + 360) % 360),
+    [90, 90, 90, 90],
+  );
+  assert.equal(!!orgPages[3].node.Contents(), false, 'trang cuối phải là trang trắng');
+  assert.equal(!!orgPages[2].node.Contents(), true, 'trang chép sang phải giữ nội dung');
+  assert.deepEqual([Math.round(orgPages[3].getWidth()), Math.round(orgPages[3].getHeight())], [102, 200]);
+  console.log('organize ok:', path.basename(organizeRes.outputs[0].path), '· 4 trang (3,1,2 + trắng) · xoay 90');
+
+  // 9e. Crop PDF: 10 mm mỗi lề trên tất cả trang -> CropBox đúng, MediaBox giữ nguyên.
+  const cropOut = path.join(OUT, 'm2-crop-out');
+  fs.rmSync(cropOut, { recursive: true, force: true });
+  fs.mkdirSync(cropOut, { recursive: true });
+  await w.evaluate(() => window.__suite.openTool('crop'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'crop');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: m2Src, out: cropOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ top: 10, right: 10, bottom: 10, left: 10, pages: '' });
+  }, { file: m2Src, out: cropOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const cropRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('crop result:', JSON.stringify(cropRes));
+  if (!cropRes?.outputs?.length) throw new Error('Crop PDF không tạo output: ' + JSON.stringify(cropRes));
+  assert.equal(cropRes.outputs.length, 1);
+  assert.equal(path.basename(cropRes.outputs[0].path), 'm2-4pages-crop.pdf');
+  const cropDoc = await PDFDocument.load(fs.readFileSync(cropRes.outputs[0].path));
+  assert.equal(cropDoc.getPageCount(), 4);
+  const mm10 = 10 * 72 / 25.4;
+  const srcWidths = [101, 102, 103, 104];
+  const near = (actual, expected, label) =>
+    assert.ok(Math.abs(actual - expected) < 0.01, `${label}: mong đợi ${expected}, nhận ${actual}`);
+  cropDoc.getPages().forEach((page, i) => {
+    const box = page.getCropBox();
+    near(box.x, mm10, `crop trang ${i + 1} x`);
+    near(box.y, mm10, `crop trang ${i + 1} y`);
+    near(box.width, srcWidths[i] - 2 * mm10, `crop trang ${i + 1} rộng`);
+    near(box.height, 200 - 2 * mm10, `crop trang ${i + 1} cao`);
+    near(page.getMediaBox().width, srcWidths[i], `media trang ${i + 1}`);
+  });
+  console.log('crop ok:', path.basename(cropRes.outputs[0].path), '· 4 trang · lề 10 mm');
 
   // 10. PDF → ảnh: worker pdf.js thật render 2 trang thành PNG trong thư mục -anh.
   const imgSrc = path.join(OUT, 'm1b-2pages.pdf');
