@@ -39,15 +39,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 3);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 11);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 11);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 5);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 9);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 9);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'pdf-images', 'protect'],
+    ['merge', 'split', 'pages', 'pdf-images', 'protect'],
   );
-  console.log('home: 14 thẻ · 3 bật (merge, pdf-images, protect) · 11 tắt · 11 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 5 bật (merge, split, pages, pdf-images, protect) · 9 tắt · 9 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -152,7 +152,7 @@ try {
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
 
   // 8. Hash công cụ “Sắp có”/không tồn tại được xoá sạch, không kẹt tool view.
-  await w.evaluate(() => { location.hash = '#/tool/split'; });
+  await w.evaluate(() => { location.hash = '#/tool/compress'; });
   await w.waitForFunction(
     () => location.hash === '' && document.getElementById('toast').textContent.includes('đợt sau'),
   );
@@ -220,6 +220,65 @@ try {
   assert.equal(rejected.job.error.message.includes(unregistered), false);
   assert.equal(rejected.reveal, false);
   console.log('allowlist: từ chối file chưa đăng ký · không lộ đường dẫn');
+
+  // 9b. Tách PDF: 4 trang bề rộng khác nhau; 1-2,4 -> 2 file (2/1 trang).
+  const m2Src = path.join(OUT, 'm2-4pages.pdf');
+  const splitOut = path.join(OUT, 'm2-split-out');
+  fs.rmSync(splitOut, { recursive: true, force: true });
+  fs.mkdirSync(splitOut, { recursive: true });
+  await makeSized(m2Src, [[101, 200], [102, 200], [103, 200], [104, 200]]);
+  await w.evaluate(() => window.__suite.openTool('split'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'split');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: m2Src, out: splitOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ mode: 'ranges', ranges: '1-2,4', every: 2 });
+  }, { file: m2Src, out: splitOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const splitRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('split result:', JSON.stringify(splitRes));
+  if (!splitRes?.outputs?.length) throw new Error('Tách PDF không tạo output: ' + JSON.stringify(splitRes));
+  assert.equal(splitRes.outputs.length, 2);
+  assert.equal(path.basename(path.dirname(splitRes.outputs[0].path)), 'm2-4pages-tach');
+  assert.deepEqual(
+    splitRes.outputs.map(o => path.basename(o.path)),
+    ['m2-4pages-01.pdf', 'm2-4pages-02.pdf'],
+  );
+  const splitDocs = await Promise.all(
+    splitRes.outputs.map(o => PDFDocument.load(fs.readFileSync(o.path))),
+  );
+  assert.deepEqual(splitDocs.map(d => d.getPageCount()), [2, 1]);
+  assert.deepEqual(
+    splitDocs.map(d => d.getPages().map(p => Math.round(p.getWidth()))),
+    [[101, 102], [104]],
+  );
+  console.log('split ok:', splitRes.outputs.map(o => path.basename(o.path)).join(', '), '· 2/1 trang');
+
+  // 9c. Xoá & trích trang: trích 2,4 giữ đúng thứ tự.
+  const pagesOut = path.join(OUT, 'm2-pages-out');
+  fs.rmSync(pagesOut, { recursive: true, force: true });
+  fs.mkdirSync(pagesOut, { recursive: true });
+  await w.evaluate(() => window.__suite.openTool('pages'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'pages');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: m2Src, out: pagesOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ mode: 'extract', pages: '2,4' });
+  }, { file: m2Src, out: pagesOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const pagesRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('pages result:', JSON.stringify(pagesRes));
+  if (!pagesRes?.outputs?.length) throw new Error('Trích trang không tạo output: ' + JSON.stringify(pagesRes));
+  assert.equal(pagesRes.outputs.length, 1);
+  assert.equal(path.basename(pagesRes.outputs[0].path), 'm2-4pages-trich-trang.pdf');
+  const pagesDoc = await PDFDocument.load(fs.readFileSync(pagesRes.outputs[0].path));
+  assert.equal(pagesDoc.getPageCount(), 2);
+  assert.deepEqual(pagesDoc.getPages().map(p => Math.round(p.getWidth())), [102, 104]);
+  console.log('pages ok:', path.basename(pagesRes.outputs[0].path), '· 2 trang (2,4)');
 
   // 10. PDF → ảnh: worker pdf.js thật render 2 trang thành PNG trong thư mục -anh.
   const imgSrc = path.join(OUT, 'm1b-2pages.pdf');

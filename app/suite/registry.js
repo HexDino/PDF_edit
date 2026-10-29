@@ -1,11 +1,20 @@
 const { merge } = require('./pdfops/organize');
+const { splitPdf } = require('./pdfops/split');
+const { pagesTool } = require('./pdfops/pageops');
 const { pdfImages } = require('./pdfops/convert');
 const { protect } = require('./pdfops/security');
 
 const TOOLS = [
   { id: 'merge', group: 'organize', title: 'Ghép PDF', description: 'Ghép nhiều file thành một, đổi được thứ tự.', icon: '⧉', accept: ['.pdf'], multiple: true, minFiles: 2, status: 'available', options: [], run: merge },
-  { id: 'split', group: 'organize', title: 'Tách PDF', description: 'Tách theo khoảng trang hoặc từng trang.', icon: '✂', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
-  { id: 'pages', group: 'organize', title: 'Xoá & trích trang', description: 'Chọn trang để xoá hoặc trích thành file mới.', icon: '▤', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
+  { id: 'split', group: 'organize', title: 'Tách PDF', description: 'Tách theo khoảng trang hoặc từng trang.', icon: '✂', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'mode', type: 'enum', values: ['ranges', 'every-n', 'each-page'], labels: { ranges: 'Theo khoảng trang', 'every-n': 'Mỗi N trang', 'each-page': 'Mỗi trang một file' }, default: 'ranges', label: 'Cách tách' },
+    { key: 'ranges', type: 'text', default: '', label: 'Khoảng trang', placeholder: '1-3,5 (trống = tất cả)' },
+    { key: 'every', type: 'int', min: 1, max: 1000, default: 2, label: 'Số trang mỗi file' },
+  ], run: splitPdf },
+  { id: 'pages', group: 'organize', title: 'Xoá & trích trang', description: 'Chọn trang để xoá hoặc trích thành file mới.', icon: '▤', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'mode', type: 'enum', values: ['delete', 'extract'], labels: { delete: 'Xoá trang', extract: 'Trích trang' }, default: 'extract', label: 'Chế độ' },
+    { key: 'pages', type: 'range', label: 'Khoảng trang', placeholder: '1-3,5 (bắt buộc khi xoá)' },
+  ], run: pagesTool },
   { id: 'organize', group: 'organize', title: 'Tổ chức trang', description: 'Đổi thứ tự, xoay, nhân bản, chèn trang trắng.', icon: '⇅', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'crop', group: 'organize', title: 'Crop PDF', description: 'Cắt lề trang theo khung tuỳ chọn.', icon: '⌗', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'stamp', group: 'stamp', title: 'Số trang & header/footer', description: 'Đánh số trang và chèn tiêu đề/chân trang.', icon: '#', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
