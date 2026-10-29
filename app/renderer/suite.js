@@ -159,12 +159,16 @@ function renderOptions() {
       f.appendChild(sel);
     } else {
       const inp = document.createElement('input');
-      inp.type = o.type === 'int' ? 'number' : o.type === 'password' ? 'password' : 'text';
+      inp.type = o.type === 'int' ? 'number' : o.type === 'password' ? 'password' : o.type === 'color' ? 'color' : 'text';
       if (o.type === 'int') { inp.min = o.min; inp.max = o.max; }
       inp.value = state.options[o.key] ?? '';
       inp.placeholder = o.placeholder || '';
       inp.oninput = () => { state.options[o.key] = o.type === 'int' ? Number(inp.value) : inp.value; };
       f.appendChild(inp);
+    }
+    if (o.hint && o.type !== 'bool') {
+      const hint = document.createElement('small'); hint.textContent = o.hint;
+      f.appendChild(hint);
     }
     box.appendChild(f);
   }

@@ -45,13 +45,19 @@
 **Interfaces**
 - `loadStampFont(doc) -> Promise<PDFFont>`: read `renderer/fonts/BeVietnamPro-Regular.ttf` (path from `suite/pdfops/`), register fontkit, embed subset.
 - `colorToRgb(hex)`, `formatTemplate(text, {page,total,date})`; date `dd/MM/yyyy`.
-- `displayToPdf(box, rotation, dx, dy)`:
+- `displayToPdf(box, rotation, dx, dy)` maps a top-left display point into the visible CropBox:
   - 0: `[x0+dx, y0+H-dy]`
   - 90: `[x0+dy, y0+dx]`
   - 180: `[x0+W-dx, y0+dy]`
   - 270: `[x0+W-dy, y0+H-dx]`
-- `textRotation(extraAngle, pageRotation) = (extraAngle - pageRotation + 360) % 360`.
+- `textRotation(extraAngle, pageRotation) = (extraAngle + pageRotation) % 360` — positive page
+  rotation, matching the editor export (`renderer/app.js` uses `rot + g.rot`). The earlier
+  minus-rotation sketch was wrong; upstream rendered checks must prove upright text at
+  0/90/180/270.
 - `drawDisplayText(page, font, text, {dx, dy, size, color, opacity, extraAngle})` normalizes rotation, maps point, draws with pdf-lib.
+- Visible page box = intersection of CropBox and MediaBox; never expand existing crops.
+- Text metrics (ascender/descender) determine header/footer baselines so margin 0 does not
+  clip descenders; impossible layout or overflowing text is `INVALID_OPTIONS`.
 - `stampTool(ctx)` options:
   - `leftText`, `centerText` (default `Trang {page}/{total}`), `rightText` text;
   - `fontSize` int 6–48 default 10;
@@ -60,8 +66,11 @@
   - `margin` int 0–100 mm default 10;
   - `startAt` int 1–10000 default 1;
   - `pages` range default all.
-  - Placeholders `{page}`, `{total}`, `{date}`; page number = startAt + (pageIndex - firstSelectedIndex); total = pageCount + startAt - 1.
-  - Layout: left at margin, center centered, right at right margin; footer baseline at H-margin-size, header at margin; 0/90/180/270 upright.
+  - Placeholders `{page}`, `{total}`, `{date}`; selected pages are sorted/deduplicated in
+    document order and numbered consecutively from `startAt`; `total` = `startAt + số trang
+    đã chọn - 1` (brief's firstSelected/total formula superseded).
+  - Layout: left at margin, center centered, right at right margin; header/footer margin
+    measures visible glyph bounds; 0/90/180/270 upright; text that cannot fit is rejected.
   - Output `<base>-so-trang.pdf` via publishUnique; temp; encrypted/corrupt mapping; signal.
 - Registry stamp available with those options; E2E counts 12/2.
 - Schema/UI `color` type: `#rrggbb`, input type color.
@@ -75,25 +84,39 @@
 
 ---
 
-## Task 2: Watermark chữ
+## Task 2: Watermark chữ và ảnh
 
-**Files:** create watermark/test; modify registry/E2E/registry test.
+**Files:** create watermark/test; modify registry/E2E/registry test; main/preload/suite.js for
+the image picker option; THIRD-PARTY-NOTICES unchanged.
 
 **Interfaces**
 - `watermarkTool(ctx)` options:
-  - `text` text default `BẢN NHÁP`;
+  - `kind` enum `text|image`, default `text`;
+  - `text` text default `BẢN NHÁP` (used when kind=text; empty text invalid);
+  - `imagePath` type `imageFile` (required when kind=image; only paths chosen via the app's
+    native picker / registered inputs; main rejects unallowlisted or non-PNG/JPG paths);
   - `fontSize` int 12–200 default 60;
   - `color` color default `#c81e1e`;
   - `opacity` int 0–100 default 20;
-  - `angle` int -180–180 default 45;
+  - `angle` int -180–180 default 45 (visual angle in display space, page-rotation aware);
   - `tile` bool default false;
+  - `margin` int 0–100 mm default 0 (inset for the tiled grid);
   - `pages` range default all.
-- Text centered (or tiled grid) per page; page-rotation aware via stamp-common; opacity via pdf-lib; output `<base>-watermark.pdf` via publishUnique.
-- Tile: grid step based on text width/size, cap ~200 draws/page; skip empty text; encrypted/corrupt/signal.
-- Registry watermark available; E2E counts 13/1; text extraction contains watermark; no overwrite.
-- Tests: template/opacity/angle mapping; tile count cap; encrypted/corrupt/pre-abort; no overwrite.
+- Text centered (or tiled grid) per page; page-rotation aware via stamp-common; opacity via
+  pdf-lib graphics state. Image watermark embeds PNG/JPG with the same opacity/rotation
+  rules, scaled down when larger than the visible page area, and is never upscaled.
+- Tile: grid step based on the watermark's rotated bounding size, cap 200 draws/page; text
+  and image share the same grid.
+- Output `<base>-watermark.pdf` via publishUnique; encrypted/corrupt/signal.
+- Registry watermark available; E2E counts 13/1; text extraction contains watermark text;
+  image watermark renders pixels; no overwrite.
+- UI image option: renderer adds a "Chọn ảnh" button using `pickFiles({accept:['.png','.jpg','.jpeg'],multiple:false})`
+  and shows the chosen file name; `jobStart` sends `imagePath`; main validates it against
+  the allowlist and jobs.js validates existence/extension again.
+- Tests: template/opacity/angle mapping; image embed (PNG + JPG), oversized scaling; tile
+  count cap; encrypted/corrupt/pre-abort; no overwrite; path not chosen → INVALID_OPTIONS.
 
-**Commit:** `M2: watermark chữ`.
+**Commit:** `M2: watermark chữ và ảnh`.
 
 ---
 

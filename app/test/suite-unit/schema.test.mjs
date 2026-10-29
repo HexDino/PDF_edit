@@ -28,3 +28,12 @@ test('từ chối tuỳ chọn lạ', () => {
 test('từ chối số ngoài khoảng', () => {
   assert.throws(() => validateOptions(tool, { dpi: 601 }), e => e.code === 'INVALID_OPTIONS');
 });
+
+test('color accepts six hexadecimal digits, preserves defaults and rejects unsafe values', () => {
+  const colored = { options: [{ key: 'color', type: 'color', default: '#1f2937' }] };
+  assert.deepEqual(validateOptions(colored), { color: '#1f2937' });
+  assert.deepEqual(validateOptions(colored, { color: '#Aa12F0' }), { color: '#Aa12F0' });
+  for (const color of ['red', '#fff', '#11223344', '#gg1122', '#112233\n', 'url(private)', 123, null]) {
+    assert.throws(() => validateOptions(colored, { color }), e => e.code === 'INVALID_OPTIONS');
+  }
+});

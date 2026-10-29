@@ -17,15 +17,15 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('11 công cụ khả dụng, 3 công cụ đang chờ', () => {
+test('12 công cụ khả dụng, 2 công cụ đang chờ', () => {
   const tools = listTools();
   for (const id of [
-    'merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata',
+    'merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata',
   ]) {
     assert.equal(tools.find(t => t.id === id).status, 'available');
   }
-  assert.equal(tools.filter(t => t.status === 'available').length, 11);
-  assert.equal(tools.filter(t => t.status === 'planned').length, 3);
+  assert.equal(tools.filter(t => t.status === 'available').length, 12);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 2);
 });
 test('split/pages có đủ tuỳ chọn cho UI', () => {
   const tools = listTools();

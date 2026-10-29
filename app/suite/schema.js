@@ -33,6 +33,10 @@ function validateOptions(tool, input = {}) {
         if (typeof v !== 'string' || v.length > 500) throw invalid(opt);
         out[opt.key] = v;
         break;
+      case 'color':
+        if (typeof v !== 'string' || v.length !== 7 || !/^#[0-9a-f]{6}$/i.test(v)) throw invalid(opt);
+        out[opt.key] = v;
+        break;
       default:
         throw invalid(opt);
     }

@@ -63,15 +63,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 11);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 3);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 3);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 12);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 2);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 2);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata'],
   );
-  console.log('home: 14 thẻ · 11 bật (merge, split, pages, organize, crop, pdf-images, images-pdf, html-pdf, protect, unlock, metadata) · 3 tắt · 3 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 12 bật (merge, split, pages, organize, crop, stamp, pdf-images, images-pdf, html-pdf, protect, unlock, metadata) · 2 tắt · 2 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -910,6 +910,110 @@ try {
   assert.doesNotMatch(metaList.stdout, /bi-mat\.txt/);
   await qpdf(['--check', metaFile]);
   console.log('metadata ok:', metaFile, '· Info/ngày/khoá tuỳ biến đã xoá hẳn, không còn tệp đính kèm');
+
+  // 12. Actual stamp form, embedded Vietnamese, rotated/cropped PDF.js geometry and pixels.
+  const stampSrc = path.join(OUT, 'm2-stamp.pdf');
+  const stampOut = path.join(OUT, 'm2-stamp-out');
+  fs.rmSync(stampOut, { recursive: true, force: true });
+  fs.mkdirSync(stampOut, { recursive: true });
+  const stampDoc = await PDFDocument.create();
+  for (const angle of [0, 90, 270]) {
+    const page = stampDoc.addPage([640, 840]);
+    page.setCropBox(50, 60, 540, 700);
+    page.setRotation(require('pdf-lib').degrees(angle));
+  }
+  fs.writeFileSync(stampSrc, await stampDoc.save());
+  const stampSourceBytes = fs.readFileSync(stampSrc);
+  await w.locator('#nav .navItem', { hasText: 'Trang chủ' }).click();
+  await w.click('#toolGrid .card[data-tool-id="stamp"]');
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'stamp');
+  const field = label => w.locator('#options .field').filter({ has: w.locator('label', { hasText: label }) }).locator('input');
+  assert.equal(await field('Nội dung giữa').inputValue(), 'Trang {page}/{total}');
+  assert.match(await w.locator('#options').textContent(), /\{page\}.*\{total\}.*\{date\}/s);
+  assert.match(await w.locator('#options').textContent(), /trang được chọn/);
+  assert.equal(await w.locator('#options input[type="color"]').inputValue(), '#1f2937');
+  await field('Nội dung trái').fill('Tiếng Việt gyp');
+  await field('Nội dung giữa').fill('Trang {page}/{total}');
+  await field('Nội dung phải').fill('Ngày {date}');
+  await field('Cỡ chữ').fill('18');
+  await field('Lề').fill('0');
+  // Playwright drives the real color input and its input event (not __suite.setOptions).
+  await w.locator('#options input[type="color"]').fill('#c02a4a');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: stampSrc, out: stampOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+  }, { file: stampSrc, out: stampOut });
+  const dateBeforeStamp = new Date().toLocaleDateString('en-GB');
+  await w.click('#runBtn');
+  const stampRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  assert.equal(stampRes?.outputs?.length, 1, JSON.stringify(stampRes));
+  const stampFile = stampRes.outputs[0].path;
+  assert.equal(path.basename(stampFile), 'm2-stamp-so-trang.pdf');
+  await qpdf(['--check', stampFile]);
+  const stampBytes = fs.readFileSync(stampFile);
+  const viewed = await w.evaluate(async bytes => {
+    const pdfjs = await import('./vendor/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', location.href).href;
+    const loading = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
+    const doc = await loading.promise;
+    try {
+      const pages = [];
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n);
+        const viewport = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+        const items = content.items.filter(i => i.str.trim()).map(i => ({
+          str: i.str, width: i.width, view: pdfjs.Util.transform(viewport.transform, i.transform),
+          descent: content.styles[i.fontName].descent,
+        }));
+        const canvas = document.createElement('canvas');
+        const scaled = page.getViewport({ scale: 2 });
+        canvas.width = scaled.width; canvas.height = scaled.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: scaled }).promise;
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let colored = 0, outsideFooter = 0;
+        const slotPixels = [0, 0, 0];
+        for (let p = 0; p < pixels.length; p += 4) {
+          if (Math.abs(pixels[p] - 192) < 8 && Math.abs(pixels[p + 1] - 42) < 8 && Math.abs(pixels[p + 2] - 74) < 8) {
+            colored++;
+            const x = (p / 4) % canvas.width;
+            const y = Math.floor(p / 4 / canvas.width);
+            slotPixels[Math.min(2, Math.floor(x / (canvas.width / 3)))]++;
+            if (y < canvas.height - 80) outsideFooter++;
+          }
+        }
+        pages.push({ width: viewport.width, height: viewport.height, items, colored, outsideFooter, slotPixels, png: canvas.toDataURL('image/png') });
+      }
+      return pages;
+    } finally { await loading.destroy(); }
+  }, [...stampBytes]);
+  assert.equal(viewed.length, 3);
+  viewed.forEach((page, i) => {
+    assert.deepEqual(page.items.map(x => x.str), ['Tiếng Việt gyp', `Trang ${i + 1}/3`, `Ngày ${dateBeforeStamp}`]);
+    for (const item of page.items) {
+      nearPt(item.view[0], 18, 'stamp advances right');
+      nearPt(item.view[1], 0, 'stamp horizontal');
+      nearPt(item.view[2], 0, 'stamp upright axis');
+      nearPt(item.view[3], -18, 'stamp upright');
+      assert.ok(item.view[5] < page.height, 'footer baseline inside view');
+      nearPt(item.view[5] - item.descent * 18, page.height, 'zero margin includes descenders');
+    }
+    nearPt(page.items[0].view[4], 0, 'left slot');
+    nearPt(page.items[1].view[4] + page.items[1].width / 2, page.width / 2, 'center slot');
+    nearPt(page.items[2].view[4] + page.items[2].width, page.width, 'right slot');
+    assert.ok(page.colored > 300, 'embedded font must render in selected color');
+    assert.ok(page.slotPixels.every(n => n > 50), 'all three slots must render');
+    assert.equal(page.outsideFooter, 0, 'paint must remain in visible footer on rotated pages');
+    fs.writeFileSync(path.join(OUT, `suite-stamp-page-${i + 1}.png`), Buffer.from(page.png.split(',')[1], 'base64'));
+  });
+  await w.click('#runBtn');
+  const stampAgain = await w.evaluate(() => window.__suite.waitJob(30000));
+  assert.equal(path.basename(stampAgain.outputs[0].path), 'm2-stamp-so-trang (2).pdf');
+  assert.deepEqual(fs.readFileSync(stampFile), stampBytes);
+  assert.deepEqual(fs.readFileSync(stampSrc), stampSourceBytes);
+  console.log('stamp ok: actual text/color form · Vietnamese/date · 0/90/270 upright cropped viewport · three rendered PNGs · no overwrite');
 } finally {
   if (remote) await new Promise(resolve => remote.close(resolve)).catch(() => {});
   await closeApp(app);
