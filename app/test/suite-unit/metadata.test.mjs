@@ -24,6 +24,10 @@ const XMP_MARKER = 'SECRET-XMP-MARKER';
 const PAGE_XMP_MARKER = 'SECRET-PAGE-XMP-MARKER';
 const COMPANY_MARKER = 'SECRET-INFO-COMPANY';
 const AF_MARKER = 'SECRET-AF-ONLY-PAYLOAD';
+const ORPHAN_INFO_MARKER = 'SECRET-ORPHAN-AUTHOR';
+const ORPHAN_INFO_KEY = 'SECRET-ORPHAN-COMPANY';
+const ORPHAN_XMP_MARKER = 'SECRET-ORPHAN-XMP';
+const ORPHAN_PAYLOAD_MARKER = 'SECRET-ORPHAN-PAYLOAD';
 const XMP = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -58,6 +62,14 @@ async function objectTypes(file) {
     const dict = obj instanceof PDFDict ? obj : obj?.dict;
     return dict instanceof PDFDict ? dict.get(PDFName.of('Type'))?.asString() : undefined;
   }).filter(Boolean);
+}
+
+// Giải nén object stream và giữ cả object không được tham chiếu (qpdf mặc
+// định bỏ chúng) để marker nằm trong object nén vẫn bị phát hiện.
+async function decodedOutput(file, dir) {
+  const decoded = path.join(dir, 'decoded.pdf');
+  await qpdf(['--qdf', '--preserve-unreferenced', '--object-streams=disable', file, decoded]);
+  return fs.readFileSync(decoded);
 }
 
 /**
@@ -103,6 +115,37 @@ async function makeRichPdf(file, {
     );
   }
   fs.writeFileSync(file, await doc.save());
+  return file;
+}
+
+/**
+ * Mô phỏng PDF đã qua revision tăng dần: Info/XMP/Filespec của revision cũ
+ * vẫn nằm trong object table nhưng trailer/catalog hiện tại không tham chiếu.
+ * pdf-lib giữ nguyên các object này khi đọc, nên công cụ phải dọn trước khi ghi.
+ */
+async function makeOrphanPdf(file) {
+  const doc = await PDFDocument.create({ updateMetadata: false });
+  doc.addPage([200, 300]);
+  doc.setTitle('Tiêu đề thật');
+  doc.setAuthor('Tác giả thật');
+  doc.context.register(doc.context.obj({
+    Author: PDFString.of(ORPHAN_INFO_MARKER),
+    Company: PDFString.of(ORPHAN_INFO_KEY),
+  }));
+  doc.context.register(doc.context.stream(ORPHAN_XMP_MARKER, {
+    Type: 'Metadata', Subtype: 'XML',
+  }));
+  const embedded = doc.context.stream(ORPHAN_PAYLOAD_MARKER, { Type: 'EmbeddedFile' });
+  doc.context.register(doc.context.obj({
+    Type: 'Filespec',
+    F: PDFString.of('orphan.txt'),
+    EF: { F: doc.context.register(embedded) },
+  }));
+  // XMP thật (có tham chiếu) để kiểm tra xoá XMP bình thường vẫn hoạt động.
+  const xmp = doc.context.stream(XMP, { Type: 'Metadata', Subtype: 'XML' });
+  doc.catalog.set(PDFName.of('Metadata'), doc.context.register(xmp));
+  // Lưu không nén object stream để khẳng định fixture thật sự chứa marker.
+  fs.writeFileSync(file, await doc.save({ useObjectStreams: false }));
   return file;
 }
 
@@ -238,6 +281,64 @@ test('XMP chỉ ở cấp trang: vẫn xoá dù catalog không có /Metadata', a
   );
   const types = await objectTypes(r.outputs[0].path);
   assert.equal(types.includes('/Metadata'), false, 'không còn object XMP mồ côi');
+});
+
+test('dọn Info/XMP/Filespec mồ côi còn sót từ revision trước', async t => {
+  const dir = tempDir(t);
+  const file = await makeOrphanPdf(path.join(dir, 'orphan.pdf'));
+  const inputBytes = fs.readFileSync(file);
+  for (const marker of [
+    ORPHAN_INFO_MARKER, ORPHAN_INFO_KEY, ORPHAN_XMP_MARKER, ORPHAN_PAYLOAD_MARKER,
+  ]) {
+    assert.equal(inputBytes.includes(Buffer.from(marker)), true, `fixture phải chứa ${marker}`);
+  }
+
+  const r = await metadataTool(ctxFor(file, dir));
+  assert.deepEqual(r.stats.removed, { info: true, xmp: true, attachments: 0 });
+
+  const out = r.outputs[0].path;
+  const outDoc = await loadOutput(out);
+  assert.equal(outDoc.context.trailerInfo.Info, undefined, 'trailer không còn /Info');
+  assert.equal(outDoc.getTitle(), undefined);
+  assert.equal(outDoc.getAuthor(), undefined);
+  const types = await objectTypes(out);
+  for (const type of ['/Metadata', '/Filespec', '/EmbeddedFile']) {
+    assert.equal(types.includes(type), false, `không còn object ${type} mồ côi`);
+  }
+  const decoded = await decodedOutput(out, dir);
+  for (const marker of [
+    ORPHAN_INFO_MARKER, ORPHAN_INFO_KEY, ORPHAN_XMP_MARKER, ORPHAN_PAYLOAD_MARKER,
+  ]) {
+    assert.equal(decoded.includes(Buffer.from(marker)), false, `không còn ${marker} trong file`);
+  }
+  await qpdf(['--check', out]);
+});
+
+test('chỉ xoá XMP vẫn dọn object mồ côi và giữ nguyên Info thật', async t => {
+  const dir = tempDir(t);
+  const file = await makeOrphanPdf(path.join(dir, 'orphan.pdf'));
+
+  const r = await metadataTool(ctxFor(file, dir, {
+    removeInfo: false, removeXmp: true, removeAttachments: false,
+  }));
+  assert.deepEqual(r.stats.removed, { info: false, xmp: true, attachments: 0 });
+
+  const out = r.outputs[0].path;
+  const outDoc = await loadOutput(out);
+  assert.equal(outDoc.getTitle(), 'Tiêu đề thật', 'Info thật phải được giữ');
+  assert.equal(outDoc.getAuthor(), 'Tác giả thật', 'Info thật phải được giữ');
+  assert.equal(outDoc.catalog.has(PDFName.of('Metadata')), false, 'XMP thật phải bị xoá');
+  const types = await objectTypes(out);
+  for (const type of ['/Metadata', '/Filespec', '/EmbeddedFile']) {
+    assert.equal(types.includes(type), false, `không còn object ${type} mồ côi`);
+  }
+  const decoded = await decodedOutput(out, dir);
+  for (const marker of [
+    ORPHAN_INFO_MARKER, ORPHAN_INFO_KEY, ORPHAN_XMP_MARKER, ORPHAN_PAYLOAD_MARKER,
+  ]) {
+    assert.equal(decoded.includes(Buffer.from(marker)), false, `không còn ${marker} trong file`);
+  }
+  await qpdf(['--check', out]);
 });
 
 test('chỉ xoá tệp đính kèm: Info và XMP còn nguyên', async t => {

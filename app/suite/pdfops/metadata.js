@@ -168,9 +168,11 @@ async function metadataTool(ctx) {
   const infoRemoved = removeInfo ? clearInfo(doc) : false;
   const xmpRemoved = removeXmpFlag ? removeXmp(doc) : false;
   const attachmentsRemoved = removeAttachments ? removeEmbeddedFiles(doc) : 0;
-  // Dọn object mồ côi (Info/giá trị Info, Filespec, EmbeddedFile…) để dữ
-  // liệu đã xoá không còn nằm trong file kết quả dưới dạng object tách rời.
-  if (infoRemoved || attachmentsRemoved) gcUnreachable(doc);
+  // Luôn dọn object không còn reachable từ trailer: bản revision tăng dần
+  // trước đây có thể còn Info/XMP/Filespec mồ côi dù trailer/catalog hiện tại
+  // không tham chiếu. Object vẫn reachable (metadata không chọn xoá) được giữ,
+  // nên ngữ nghĩa tuỳ chọn từng phần không đổi.
+  gcUnreachable(doc);
   ctx.signal.throwIfAborted();
 
   const tmp = path.join(ctx.tempDir, 'metadata.pdf');
