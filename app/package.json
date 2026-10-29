@@ -2,10 +2,15 @@
   "name": "trinh-sua-pdf",
   "productName": "Trình sửa PDF",
   "version": "1.1.0",
-  "description": "Trình sửa PDF – thêm chữ viết tay, tẩy xóa, chữ ký",
+  "description": "Bộ công cụ PDF offline cho Windows: 13 công cụ (ghép, tách, tổ chức, crop, số trang, watermark, chuyển đổi, bảo mật) và trình sửa PDF.",
   "author": "Nguyễn Thanh Hưng",
   "main": "main.js",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HexDino/PDF_edit.git"
+  },
+  "homepage": "https://github.com/HexDino/PDF_edit#readme",
   "scripts": {
     "start": "electron .",
     "fetch:qpdf": "node scripts/fetch-qpdf.mjs",

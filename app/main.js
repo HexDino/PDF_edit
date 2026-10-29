@@ -150,7 +150,7 @@ else {
   });
   app.whenReady().then(() => {
     protocol.handle('app', req => {
-      const u = new URL(req.url); if (process.env.TSP_DEBUG) fs.appendFileSync(require('os').tmpdir() + '/tsp-debug.log', req.url + '\n');
+      const u = new URL(req.url);
       let p = path.normalize(path.join(RENDERER, decodeURIComponent(u.pathname)));
       if (!p.startsWith(RENDERER)) return new Response('forbidden', { status: 403 });
       const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.ttf': 'font/ttf',
@@ -264,7 +264,6 @@ function createWindow() {
   });
   win.setMenu(null);
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
-  if (process.env.TSP_DEBUG) win.webContents.on('console-message', (_e, lvl, msg, line, src) => fs.appendFileSync(require('os').tmpdir() + '/tsp-debug.log', `[console ${lvl}] ${msg} (${src}:${line})\n`));
   loadEntry(startEntry());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', e => e.preventDefault());

@@ -13,3 +13,21 @@ Authors: Andrew Dillon, Devon Govett and contributors
 License: MIT — toàn văn tại licenses/MIT-fontkit.txt
 Source: https://github.com/Hopding/fontkit
 Upstream: https://github.com/foliojs/fontkit
+
+pdf.js (bản nhúng sẵn trong renderer/vendor/)
+Copyright 2024 Mozilla Foundation
+License: Apache-2.0 — toàn văn tại licenses/Apache-2.0.txt
+Files: renderer/vendor/pdf.min.mjs, pdf.worker.min.mjs, cmaps/, standard_fonts/
+
+pako 1.0.11 (phụ thuộc của @pdf-lib/fontkit)
+License: MIT — toàn văn tại node_modules/pako/LICENSE (nằm trong app.asar)
+
+Phông chữ trong renderer/fonts/
+29 phông dùng trong editor (gồm Be Vietnam Pro) và các biến thể Be Vietnam Pro cho giao diện,
+lấy từ Google Fonts
+License: SIL Open Font License 1.1 — https://scripts.sil.org/OFL
+Phông chuẩn PDF.js (Foxit, Liberation): renderer/vendor/standard_fonts/LICENSE_FOXIT, LICENSE_LIBERATION
+
+Electron 33.4.11 / Chromium
+License: MIT và các giấy phép bên thứ ba — LICENSE.electron.txt và LICENSES.chromium.html
+được đóng gói cạnh file chạy trong bản phát hành.
