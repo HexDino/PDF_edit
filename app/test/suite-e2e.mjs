@@ -39,15 +39,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 8);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 6);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 6);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 9);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 5);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 5);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'protect', 'unlock'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'protect', 'unlock', 'metadata'],
   );
-  console.log('home: 14 thẻ · 8 bật (merge, split, pages, organize, crop, pdf-images, protect, unlock) · 6 tắt · 6 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 9 bật (merge, split, pages, organize, crop, pdf-images, protect, unlock, metadata) · 5 tắt · 5 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -139,7 +139,7 @@ try {
   await w.waitForFunction(() => location.hash === '' && !document.getElementById('homeView').hidden);
   assert.equal(await w.locator('#toolView').isVisible(), false);
   assert.equal(await w.locator('#toolGrid .card').count(), 3);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 2);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 3);
   assert.deepEqual(await cardIds(w), ['protect', 'unlock', 'metadata']);
   assert.equal(await w.locator('#toolGrid .groupTitle').textContent(), 'Bảo mật');
   assert.equal(await w.locator('#nav .navItem.on').count(), 1);
@@ -178,7 +178,7 @@ try {
   const a = path.join(OUT, 'm1a-a.pdf'), b = path.join(OUT, 'm1a-b.pdf'), outDir = path.join(OUT, 'm1a-out');
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
-  const { PDFDocument } = require('pdf-lib');
+  const { PDFDocument, PDFName } = require('pdf-lib');
   async function make(file, n) {
     const d = await PDFDocument.create();
     for (let i = 0; i < n; i++) d.addPage([100 + i, 200]);
@@ -549,6 +549,67 @@ try {
   const unlockedDoc = await PDFDocument.load(fs.readFileSync(unlocked));
   assert.equal(unlockedDoc.getPageCount(), 2);
   console.log('unlock ok:', unlocked, '· không còn mã hoá, mở không cần mật khẩu');
+
+  // 11c. Xoá metadata: PDF có Info + tệp đính kèm; mặc định xoá cả ba loại.
+  const metaOut = path.join(OUT, 'm1b-metadata-out');
+  fs.rmSync(metaOut, { recursive: true, force: true });
+  fs.mkdirSync(metaOut, { recursive: true });
+  const metaSrc = path.join(OUT, 'm1b-metadata.pdf');
+  const metaDoc = await PDFDocument.create();
+  metaDoc.addPage([200, 300]);
+  metaDoc.setTitle('Tài liệu nội bộ');
+  metaDoc.setAuthor('Nguyễn Văn A');
+  metaDoc.setSubject('Chủ đề mật');
+  metaDoc.setKeywords(['mật', 'nội bộ']);
+  const metaXmp = '<x:xmpmeta xmlns:x="adobe:ns:meta/">SECRET-XMP-E2E</x:xmpmeta>';
+  metaDoc.catalog.set(
+    PDFName.of('Metadata'),
+    metaDoc.context.register(metaDoc.context.stream(metaXmp, { Type: 'Metadata', Subtype: 'XML' })),
+  );
+  await metaDoc.attach(Buffer.from('tệp đính kèm bí mật'), 'bi-mat.txt', { mimeType: 'text/plain' });
+  fs.writeFileSync(metaSrc, await metaDoc.save());
+
+  await w.evaluate(() => window.__suite.openTool('metadata'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'metadata');
+  assert.deepEqual(
+    await w.$$eval('#options .field > label:not(.row)', els => els.map(el => el.textContent)),
+    ['Xoá thông tin tài liệu (Info)', 'Xoá XMP metadata', 'Xoá tệp đính kèm'],
+  );
+  assert.equal(await w.locator('#options input[type="checkbox"]').count(), 3);
+  assert.equal(
+    await w.$$eval('#options input[type="checkbox"]', els => els.every(el => el.checked)),
+    true,
+    'cả ba tuỳ chọn phải bật mặc định',
+  );
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: metaSrc, out: metaOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+  }, { file: metaSrc, out: metaOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const metaRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('metadata result:', JSON.stringify(metaRes));
+  if (!metaRes?.outputs?.length) throw new Error('Xoá metadata không tạo output: ' + JSON.stringify(metaRes));
+  assert.equal(metaRes.outputs.length, 1);
+  assert.deepEqual(metaRes.stats.removed, { info: true, xmp: true, attachments: 1 });
+  const metaFile = metaRes.outputs[0].path;
+  assert.equal(path.basename(metaFile), 'm1b-metadata-xoa-metadata.pdf');
+  assert.equal(path.dirname(path.resolve(metaFile)), path.resolve(metaOut));
+  assert.ok(fs.statSync(metaFile).size > 0, 'file xoá metadata phải có dữ liệu');
+  const cleanedDoc = await PDFDocument.load(fs.readFileSync(metaFile), { updateMetadata: false });
+  assert.equal(cleanedDoc.getPageCount(), 1);
+  assert.equal(cleanedDoc.getTitle(), '');
+  assert.equal(cleanedDoc.getAuthor(), '');
+  assert.equal(cleanedDoc.getSubject(), '');
+  assert.equal(cleanedDoc.getKeywords(), '');
+  assert.equal(cleanedDoc.catalog.has(PDFName.of('Metadata')), false);
+  assert.equal(cleanedDoc.catalog.has(PDFName.of('AF')), false);
+  assert.equal(fs.readFileSync(metaFile).includes(Buffer.from('SECRET-XMP-E2E')), false);
+  const metaList = await qpdf(['--list-attachments', metaFile]);
+  assert.doesNotMatch(metaList.stdout, /bi-mat\.txt/);
+  await qpdf(['--check', metaFile]);
+  console.log('metadata ok:', metaFile, '· Info rỗng, không còn tệp đính kèm');
 } finally {
   await closeApp(app);
 }
