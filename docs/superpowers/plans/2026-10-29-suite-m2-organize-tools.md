@@ -18,7 +18,7 @@
 - One JobRunner; no overwrite; temp then publish; cancel cleans partial output/folder.
 - Input encrypted -> `PASSWORD_REQUIRED`; corrupt -> `INVALID_FILE`; short Vietnamese UI errors.
 - Output naming: split folder `<base>-tach/`; pages `<base>-xoa-trang.pdf` / `<base>-trich-trang.pdf`; organize `<base>-to-chuc.pdf`; crop `<base>-crop.pdf`.
-- Home available count after Task A: 5 (merge, split, pages, pdf-images, protect); after Task B: 7 (adds organize, crop). Planned 9 → 7.
+- Home available count after Task 1: 5 (merge, split, pages, pdf-images, protect); after Task 2: 7 (adds organize, crop). Planned 9 → 7.
 - No visual thumbnail/reorder UI in this plan; M3 redesign.
 
 ---
@@ -44,7 +44,7 @@
 
 ---
 
-## Task A: Tách PDF + Xoá & trích trang
+## Task 1: Tách PDF + Xoá & trích trang
 
 **Files:** create `split.js`, `pageops.js`, tests; modify `pages.js`, registry, E2E counts/flows, registry test.
 
@@ -65,12 +65,12 @@
 - Registry: `split` and `pages` status available; option schemas:
   - split: `mode` enum values `ranges/every-n/each-page`, default `ranges`; `ranges` text placeholder `1-3,5 (trống = tất cả)`; `every` int min 1 max 1000 default 2.
   - pages: `mode` enum `delete/extract` default `extract`; `pages` range placeholder `1-3,5 (bắt buộc khi xoá)`.
-- Update registry test (`>=9` planned after A; `>=7` after B) and `tools.length` 14.
+- Update registry test (`>=9` planned after Task 1; `>=7` after Task 2) and `tools.length` 14.
 - Commit: `M2: tách PDF và xoá/trích trang`.
 
 ---
 
-## Task B: Tổ chức trang + Crop PDF
+## Task 2: Tổ chức trang + Crop PDF
 
 **Files:** create `reorder.js`, `crop.js`, tests; modify registry, E2E counts/flows, registry test.
 
