@@ -10,6 +10,6 @@ License: MIT — https://github.com/Hopding/pdf-lib
 
 @pdf-lib/fontkit 1.1.1
 Authors: Andrew Dillon, Devon Govett and contributors
-License: MIT — package.json and README.md in node_modules/@pdf-lib/fontkit
+License: MIT — toàn văn tại licenses/MIT-fontkit.txt
 Source: https://github.com/Hopding/fontkit
 Upstream: https://github.com/foliojs/fontkit

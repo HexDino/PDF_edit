@@ -230,9 +230,10 @@ Ghi chú:
 | `stamp` | Số trang & header/footer | 3 ô trái/giữa/phải; placeholder `{page}`, `{total}`, `{date}`; phông Be Vietnam Pro; cỡ; màu; lề; số bắt đầu; khoảng trang | 1 PDF; mặc định đánh số `Trang {page}/{total}` ở giữa dưới |
 | `watermark` | Watermark | chữ hoặc ảnh; phông/cỡ/màu; độ mờ 0–100%; xoay; vị trí giữa hoặc lát kín; lề; khoảng trang | 1 PDF; watermark nằm trên nội dung (không hỗ trợ “dưới nội dung” ở đợt 1) |
 
-- Nhúng phông subset; nếu thiếu glyph tiếng Việt thì báo `MISSING_GLYPHS` và liệt kê ký tự (dùng lại `fonts-coverage`).
-- Watermark ảnh: nhận PNG/JPG; độ mờ áp bằng ExtGState.
-- Vị trí tính theo MediaBox hiện tại; trang xoay dùng cùng phép biến đổi với editor, có test.
+- Nhúng phông subset; nếu thiếu glyph tiếng Việt thì báo `MISSING_GLYPHS` và dừng job, liệt kê mã ký tự (an toàn hơn xuất glyph .notdef).
+- Đợt 1 dùng cố định Be Vietnam Pro cho số trang và watermark chữ; chọn thêm phông để sau.
+- Watermark ảnh: nhận PNG/JPG; độ mờ áp bằng ExtGState (pdf-lib graphics state).
+- Vị trí tính theo vùng hiển thị CropBox∩MediaBox; trang xoay dùng cùng phép biến đổi với editor, có test.
 
 ### 6.3 Chuyển đổi
 
