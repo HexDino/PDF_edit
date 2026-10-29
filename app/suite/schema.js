@@ -1,6 +1,9 @@
 const { ToolError } = require('./errors');
 
 function validateOptions(tool, input = {}) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ToolError('INVALID_OPTIONS', 'Tuỳ chọn không hợp lệ.');
+  }
   const defs = tool.options || [];
   const out = {};
   for (const opt of defs) {

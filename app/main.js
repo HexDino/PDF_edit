@@ -111,13 +111,25 @@ function assertJobPathsAllowed(req) {
   if (req.outputDir != null && !isAllowedRoot(req.outputDir)) {
     throw new ToolError('FORBIDDEN', 'Thư mục xuất chưa được chọn trong ứng dụng.');
   }
+  // Tuỳ chọn phải là object thường; mảng mang thuộc tính riêng không được lọt qua.
+  if (req.options !== undefined) {
+    if (req.options === null || typeof req.options !== 'object' || Array.isArray(req.options)) {
+      throw new ToolError('INVALID_OPTIONS', 'Tuỳ chọn không hợp lệ.');
+    }
+  }
   // Option kiểu imageFile cũng là đường dẫn người dùng phải chọn qua picker.
   const tool = getTools().find(t => t.id === req.toolId);
-  const options = req.options && typeof req.options === 'object' && !Array.isArray(req.options) ? req.options : {};
+  const options = req.options || {};
   for (const opt of tool?.options || []) {
     if (opt.type !== 'imageFile') continue;
     const value = options[opt.key];
     if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string') throw new ToolError('INVALID_OPTIONS', 'Tuỳ chọn không hợp lệ.');
+    const accept = (Array.isArray(opt.accept) ? opt.accept : ['.png', '.jpg', '.jpeg'])
+      .map(a => String(a).toLowerCase());
+    if (!accept.includes(path.extname(value).toLowerCase())) {
+      throw new ToolError('INVALID_OPTIONS', 'Ảnh watermark phải là PNG hoặc JPG.');
+    }
     if (!isAllowedFile(value)) throw new ToolError('FORBIDDEN', 'Ảnh chưa được chọn trong ứng dụng.');
   }
 }

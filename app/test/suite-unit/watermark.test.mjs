@@ -183,7 +183,12 @@ function imageObjects(doc, page) {
   const xobjects = resources && resources.lookup(PDFName.of('XObject'));
   if (!xobjects) return [];
   const out = [];
+  // pdf-lib adds one resource key per drawImage call, all pointing at the same
+  // embedded stream; count each embedded object once.
+  const seen = new Set();
   for (const [, ref] of xobjects.entries()) {
+    if (seen.has(ref)) continue;
+    seen.add(ref);
     const stream = doc.context.lookup(ref);
     const dict = stream && stream.dict;
     if (!dict) continue;
@@ -280,6 +285,14 @@ test('text is centered at the requested visual angle in PDF.js on 0/90/180/270 c
   for (const dir of s.temps) assert.deepEqual(fs.readdirSync(dir), [], 'temp watermark file must be cleaned up');
 });
 
+test('text opacity 80 emits an ExtGState with ca 0.8', async t => {
+  const s = setup(t);
+  await fixture(s.file, [0]);
+  const result = await watermark(s.ctx({ text: 'MỜ', opacity: 80 }));
+  const loaded = await PDFDocument.load(fs.readFileSync(result.outputs[0].path));
+  assert.deepEqual(opacityStates(loaded), [0.8]);
+});
+
 test('page range selects and sorts pages for the watermark and invalid ranges fail', async t => {
   const s = setup(t);
   await fixture(s.file, [0, 0, 0, 0]);
@@ -309,6 +322,24 @@ test('tiled text is inset by the margin, keeps each rotated box inside the view,
         assert.ok(x >= marginPt - 0.02 && x <= viewport.width - marginPt + 0.02, `tile x inside margin: ${x}`);
         assert.ok(y >= marginPt - 0.02 && y <= viewport.height - marginPt + 0.02, `tile y inside margin: ${y}`);
       }
+    }
+  });
+});
+
+test('tiled text applies to a rotated page after page 1 only', async t => {
+  const s = setup(t);
+  await fixture(s.file, [0, 90]);
+  const options = { text: 'TRANG SAU', fontSize: 12, opacity: 100, angle: 30, tile: true, margin: 5, pages: '2' };
+  const result = await watermark(s.ctx(options));
+  assert.equal(result.stats.pages, 1);
+  assert.ok(result.stats.draws > 1 && result.stats.draws <= 200, `tile draws: ${result.stats.draws}`);
+  await inspect(result.outputs[0].path, pages => {
+    assert.deepEqual(pages[0].items, [], 'page 1 must stay unmarked');
+    assert.equal(pages[1].items.length, result.stats.draws);
+    for (const item of pages[1].items) {
+      assert.equal(item.str, 'TRANG SAU');
+      const angle = ((Math.atan2(-item.view[1], item.view[0]) * 180 / Math.PI) % 360 + 360) % 360;
+      near(angle, 30, 'tiled text keeps the requested visual angle on the rotated page');
     }
   });
 });
@@ -405,6 +436,47 @@ test('oversized JPG is scaled down to fit a rotated non-cropped display area', a
   near(draws[0].center[0], box.x + box.width / 2, 'image centered in page space');
   near(draws[0].center[1], box.y + box.height / 2, 'image centered in page space');
   assert.deepEqual(opacityStates(loaded), [0.35]);
+});
+
+test('tiled image with no margin repeats one embedded XObject without upscaling', async t => {
+  const s = setup(t);
+  await fixture(s.file, [0]);
+  const image = path.join(s.dir, 'tile.png');
+  fs.writeFileSync(image, solidPng(40, 20));
+  const result = await watermark(s.ctx({
+    kind: 'image', imagePath: image, opacity: 100, angle: 0, tile: true, margin: 0,
+  }));
+  assert.equal(result.stats.pages, 1);
+  assert.ok(result.stats.draws > 1 && result.stats.draws <= 200, `tile draws: ${result.stats.draws}`);
+  const loaded = await PDFDocument.load(fs.readFileSync(result.outputs[0].path));
+  const objects = imageObjects(loaded, loaded.getPage(0));
+  assert.equal(objects.length, 1, 'one embedded image XObject shared by every draw');
+  assert.deepEqual(objects[0], { width: 40, height: 20 });
+  const draws = imageDraws((await contentStreams(result.outputs[0].path))[0]);
+  assert.equal(draws.length, result.stats.draws);
+  for (const draw of draws) {
+    near(draw.width, 40, 'image is not upscaled');
+    near(draw.height, 20, 'image is not upscaled');
+  }
+});
+
+test('tiled image with a margin repeats on a rotated page with one embedded XObject', async t => {
+  const s = setup(t);
+  await fixture(s.file, [90]);
+  const image = path.join(s.dir, 'tile-margin.png');
+  fs.writeFileSync(image, solidPng(24, 12));
+  const result = await watermark(s.ctx({
+    kind: 'image', imagePath: image, opacity: 50, angle: 25, tile: true, margin: 10,
+  }));
+  assert.equal(result.stats.pages, 1);
+  assert.ok(result.stats.draws > 1 && result.stats.draws <= 200, `tile draws: ${result.stats.draws}`);
+  const loaded = await PDFDocument.load(fs.readFileSync(result.outputs[0].path));
+  const objects = imageObjects(loaded, loaded.getPage(0));
+  assert.equal(objects.length, 1, 'one embedded image XObject shared by every draw');
+  assert.deepEqual(objects[0], { width: 24, height: 12 });
+  const draws = imageDraws((await contentStreams(result.outputs[0].path))[0]);
+  assert.equal(draws.length, result.stats.draws);
+  assert.deepEqual([...new Set(opacityStates(loaded))], [0.5]);
 });
 
 test('image mode rejects missing, empty, non-image, unreadable and corrupt paths safely', async t => {

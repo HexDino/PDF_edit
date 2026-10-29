@@ -14,7 +14,7 @@ const {
 const watermarkOptions = [
   { key: 'kind', type: 'enum', values: ['text', 'image'], labels: { text: 'Chữ', image: 'Ảnh' }, default: 'text', label: 'Kiểu watermark' },
   { key: 'text', type: 'text', default: 'BẢN NHÁP', label: 'Nội dung chữ' },
-  { key: 'imagePath', type: 'imageFile', default: '', label: 'Ảnh watermark', hint: 'PNG hoặc JPG, chọn từ máy.' },
+  { key: 'imagePath', type: 'imageFile', accept: ['.png', '.jpg', '.jpeg'], default: '', label: 'Ảnh watermark', hint: 'PNG hoặc JPG, chọn từ máy.' },
   { key: 'fontSize', type: 'int', min: 12, max: 200, default: 60, label: 'Cỡ chữ (pt)' },
   { key: 'color', type: 'color', default: '#c81e1e', label: 'Màu chữ' },
   { key: 'opacity', type: 'int', min: 0, max: 100, default: 20, label: 'Độ mờ (%)' },

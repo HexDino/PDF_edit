@@ -38,6 +38,18 @@ test('color accepts six hexadecimal digits, preserves defaults and rejects unsaf
   }
 });
 
+test('rejects option bags that are not plain objects', () => {
+  const arrays = [
+    [],
+    Object.assign([], { dpi: 300 }),
+    Object.assign([], { imagePath: 'C:\\private\\a.png' }),
+  ];
+  for (const input of [...arrays, null, 'dpi=300', 42, true]) {
+    assert.throws(() => validateOptions(tool, input), e =>
+      e.code === 'INVALID_OPTIONS' && e.message === 'Tuỳ chọn không hợp lệ.');
+  }
+});
+
 test('imageFile accepts empty/normal paths, bounded length, and rejects NUL/CR/LF', () => {
   const image = { options: [{ key: 'imagePath', type: 'imageFile', default: '' }] };
   assert.deepEqual(validateOptions(image), { imagePath: '' });

@@ -1229,6 +1229,63 @@ try {
   assert.equal(wmDenied.error.message.includes(unregisteredImage), false, 'error must not echo the path');
   assert.equal(wmDenied.error.message.includes(APP_ROOT), false, 'error must not echo a root path');
   console.log('watermark image allowlist ok: FORBIDDEN · no path in message');
+
+  // 13d. Tuỳ chọn dạng mảng (mảng mang thuộc tính riêng) không được lọt qua
+  // allowlist; ảnh .txt đã đăng ký vẫn bị từ chối theo định dạng.
+  await w.evaluate(() => {
+    window.__wmRejectedEvents = [];
+    window.api.suite.onJobEvent(ev => window.__wmRejectedEvents.push(ev));
+  });
+  const arrayDenied = await w.evaluate(async ({ file, out, imagePath }) => window.api.suite.jobStart({
+    toolId: 'watermark', files: [file], options: Object.assign([], { kind: 'image', imagePath }), outputDir: out,
+  }), { file: wmImgSrc, out: wmImgOut, imagePath: unregisteredImage });
+  assert.equal(arrayDenied.ok, false);
+  assert.equal(arrayDenied.error.code, 'INVALID_OPTIONS');
+  assert.equal(arrayDenied.error.message.includes(unregisteredImage), false, 'array error must not echo the path');
+  assert.equal(arrayDenied.error.message.includes(APP_ROOT), false, 'array error must not echo a root path');
+
+  const arrayRegisteredDenied = await w.evaluate(async ({ file, out, imagePath }) => window.api.suite.jobStart({
+    toolId: 'watermark', files: [file], options: Object.assign([], { kind: 'image', imagePath }), outputDir: out,
+  }), { file: wmImgSrc, out: wmImgOut, imagePath: wmRedPng });
+  assert.equal(arrayRegisteredDenied.ok, false);
+  assert.equal(arrayRegisteredDenied.error.code, 'INVALID_OPTIONS', 'array shape is invalid even with a registered path');
+
+  const wmTxt = path.join(OUT, 'm2-wm-note.txt');
+  fs.writeFileSync(wmTxt, 'not an image');
+  await w.evaluate(p => window.api.suite.registerInput([p]), wmTxt);
+  const txtDenied = await w.evaluate(async ({ file, out, imagePath }) => window.api.suite.jobStart({
+    toolId: 'watermark', files: [file], options: { kind: 'image', imagePath }, outputDir: out,
+  }), { file: wmImgSrc, out: wmImgOut, imagePath: wmTxt });
+  assert.equal(txtDenied.ok, false);
+  assert.equal(txtDenied.error.code, 'INVALID_OPTIONS');
+  assert.equal(txtDenied.error.message, 'Ảnh watermark phải là PNG hoặc JPG.');
+  assert.equal(txtDenied.error.message.includes(wmTxt), false, 'extension error must not echo the path');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.deepEqual(await w.evaluate(() => window.__wmRejectedEvents), [], 'rejected option bags must not emit a job event');
+  console.log('watermark option shape ok: array not accepted · .txt registered still INVALID_OPTIONS · no job event');
+
+  // 13e. Nút "Chọn ảnh" thật đi qua dialog của main process; chỉ tên file vào DOM.
+  await app.evaluate(({ dialog }, imagePath) => {
+    globalThis.__wmOriginalShowOpenDialog = dialog.showOpenDialog;
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [imagePath] });
+  }, wmRedPng);
+  await w.locator('#nav .navItem', { hasText: 'Trang chủ' }).click();
+  await w.click('#toolGrid .card[data-tool-id="watermark"]');
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'watermark');
+  assert.equal(await w.locator('#options input[readonly]').inputValue(), '');
+  await w.locator('#options button', { hasText: 'Chọn ảnh' }).click();
+  await w.waitForFunction(p => window.__suite.state.options.imagePath === p, wmRedPng);
+  assert.equal(await w.locator('#options input[readonly]').inputValue(), path.basename(wmRedPng));
+  assert.equal(await w.evaluate(() => window.__suite.state.options.imagePath), wmRedPng);
+  assert.equal((await w.locator('#options').textContent()).includes(wmRedPng), false, 'UI must not show the absolute picked path');
+  await w.locator('#options button', { hasText: 'Bỏ' }).click();
+  assert.equal(await w.locator('#options input[readonly]').inputValue(), '');
+  assert.equal(await w.evaluate(() => window.__suite.state.options.imagePath), '');
+  await app.evaluate(({ dialog }) => {
+    if (globalThis.__wmOriginalShowOpenDialog) dialog.showOpenDialog = globalThis.__wmOriginalShowOpenDialog;
+    delete globalThis.__wmOriginalShowOpenDialog;
+  });
+  console.log('watermark image picker ok: "Chọn ảnh" basename in DOM · full path in state · "Bỏ" clears');
 } finally {
   if (remote) await new Promise(resolve => remote.close(resolve)).catch(() => {});
   await closeApp(app);
