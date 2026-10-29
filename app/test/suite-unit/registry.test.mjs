@@ -17,13 +17,13 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('merge/split/pages/organize/crop khả dụng, 7 công cụ đang chờ', () => {
+test('merge/split/pages/organize/crop/protect/unlock khả dụng, 6 công cụ đang chờ', () => {
   const tools = listTools();
-  for (const id of ['merge', 'split', 'pages', 'organize', 'crop']) {
+  for (const id of ['merge', 'split', 'pages', 'organize', 'crop', 'protect', 'unlock']) {
     assert.equal(tools.find(t => t.id === id).status, 'available');
   }
-  assert.equal(tools.filter(t => t.status === 'available').length, 7);
-  assert.equal(tools.filter(t => t.status === 'planned').length, 7);
+  assert.equal(tools.filter(t => t.status === 'available').length, 8);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 6);
 });
 test('split/pages có đủ tuỳ chọn cho UI', () => {
   const tools = listTools();
@@ -64,6 +64,15 @@ test('protect nói rõ mật khẩu chủ bắt buộc khi hạn chế quyền',
   const p = listTools().find(t => t.id === 'protect');
   const owner = p.options.find(o => o.key === 'ownerPassword');
   assert.match(owner.label, /bắt buộc/i);
+});
+test('unlock yêu cầu mật khẩu hiện có', () => {
+  const u = listTools().find(t => t.id === 'unlock');
+  assert.equal(u.status, 'available');
+  assert.equal(u.options.length, 1);
+  assert.equal(u.options[0].key, 'password');
+  assert.equal(u.options[0].type, 'password');
+  assert.equal(u.options[0].required, true);
+  assert.equal(u.options[0].label, 'Mật khẩu hiện có');
 });
 test('không lộ hàm run qua IPC', () => {
   for (const t of listTools()) assert.equal(t.run, undefined);

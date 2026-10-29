@@ -5,6 +5,7 @@ const { organizeTool } = require('./pdfops/reorder');
 const { cropTool } = require('./pdfops/crop');
 const { pdfImages } = require('./pdfops/convert');
 const { protect } = require('./pdfops/security');
+const { unlockTool } = require('./pdfops/unlock');
 
 const TOOLS = [
   { id: 'merge', group: 'organize', title: 'Ghép PDF', description: 'Ghép nhiều file thành một, đổi được thứ tự.', icon: '⧉', accept: ['.pdf'], multiple: true, minFiles: 2, status: 'available', options: [], run: merge },
@@ -47,7 +48,9 @@ const TOOLS = [
     { key: 'allowCopy', type: 'bool', default: false, label: 'Cho phép sao chép' },
     { key: 'allowModify', type: 'bool', default: false, label: 'Cho phép sửa' },
   ], run: protect },
-  { id: 'unlock', group: 'security', title: 'Mở khoá PDF', description: 'Gỡ mã hoá khi biết mật khẩu.', icon: '🔓', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
+  { id: 'unlock', group: 'security', title: 'Mở khoá PDF', description: 'Gỡ mã hoá khi biết mật khẩu.', icon: '🔓', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'password', type: 'password', required: true, label: 'Mật khẩu hiện có' },
+  ], run: unlockTool },
   { id: 'metadata', group: 'security', title: 'Xoá metadata', description: 'Xoá thông tin tác giả, XMP và tệp đính kèm.', icon: '🧹', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
 ];
 

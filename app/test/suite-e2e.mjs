@@ -39,15 +39,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 7);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 7);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 7);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 8);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 6);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 6);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'protect'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'pdf-images', 'protect', 'unlock'],
   );
-  console.log('home: 14 thẻ · 7 bật (merge, split, pages, organize, crop, pdf-images, protect) · 7 tắt · 7 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 8 bật (merge, split, pages, organize, crop, pdf-images, protect, unlock) · 6 tắt · 6 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -139,7 +139,7 @@ try {
   await w.waitForFunction(() => location.hash === '' && !document.getElementById('homeView').hidden);
   assert.equal(await w.locator('#toolView').isVisible(), false);
   assert.equal(await w.locator('#toolGrid .card').count(), 3);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 1);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 2);
   assert.deepEqual(await cardIds(w), ['protect', 'unlock', 'metadata']);
   assert.equal(await w.locator('#toolGrid .groupTitle').textContent(), 'Bảo mật');
   assert.equal(await w.locator('#nav .navItem.on').count(), 1);
@@ -510,6 +510,45 @@ try {
     e => e.exitCode !== 0,
   );
   console.log('protect ok:', locked, '· mở = user, chủ = owner, in được; sao chép/sửa bị chặn');
+
+  // 11b. Mở khoá PDF: fixture AES-256 được gỡ mã hoá bằng mật khẩu đúng;
+  // file kết quả mở/kiểm tra được mà không cần mật khẩu.
+  const unlockOut = path.join(OUT, 'm1b-unlock-out');
+  fs.rmSync(unlockOut, { recursive: true, force: true });
+  fs.mkdirSync(unlockOut, { recursive: true });
+  const lockedSrc = path.join(OUT, 'm1b-locked.pdf');
+  await qpdf(['--encrypt', '--user-password=secret', '--owner-password=owner',
+    '--bits=256', '--', imgSrc, lockedSrc]);
+  const lockProbe = await qpdf(['--show-encryption', '--password=secret', lockedSrc]);
+  assert.match(lockProbe.stdout, /R = 6/);
+  assert.match(lockProbe.stdout, /AESv3/);
+
+  await w.evaluate(() => window.__suite.openTool('unlock'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'unlock');
+  assert.equal(await w.locator('#options .field > label').textContent(), 'Mật khẩu hiện có');
+  assert.equal(await w.locator('#options input[type="password"]').count(), 1);
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: lockedSrc, out: unlockOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ password: 'secret' });
+  }, { file: lockedSrc, out: unlockOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const unlockRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('unlock result:', JSON.stringify(unlockRes));
+  if (!unlockRes?.outputs?.length) throw new Error('Mở khoá PDF không tạo output: ' + JSON.stringify(unlockRes));
+  assert.equal(unlockRes.outputs.length, 1);
+  const unlocked = unlockRes.outputs[0].path;
+  assert.equal(path.basename(unlocked), 'm1b-locked-mo-khoa.pdf');
+  assert.equal(path.dirname(path.resolve(unlocked)), path.resolve(unlockOut));
+  assert.ok(fs.statSync(unlocked).size > 0, 'file mở khoá phải có dữ liệu');
+  const unlockedShow = await qpdf(['--show-encryption', unlocked]);
+  assert.match(unlockedShow.stdout, /File is not encrypted/);
+  await qpdf(['--check', unlocked]);
+  const unlockedDoc = await PDFDocument.load(fs.readFileSync(unlocked));
+  assert.equal(unlockedDoc.getPageCount(), 2);
+  console.log('unlock ok:', unlocked, '· không còn mã hoá, mở không cần mật khẩu');
 } finally {
   await closeApp(app);
 }
