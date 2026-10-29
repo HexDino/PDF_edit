@@ -76,6 +76,34 @@ function collectNameTree(node, refs, seen = new Set()) {
   return count;
 }
 
+// pdf-lib ghi mọi object đã đọc, kể cả object không còn ai tham chiếu. Sau khi
+// bỏ cây tên đính kèm, dọn các object mồ côi (Filespec, EmbeddedFile…) để dữ
+// liệu tệp đính kèm không còn nằm trong file kết quả.
+function gcUnreachable(doc) {
+  const reachable = new Set();
+  const visit = value => {
+    if (value instanceof PDFRef) {
+      if (reachable.has(value)) return;
+      reachable.add(value);
+      visit(doc.context.lookup(value));
+      return;
+    }
+    if (value instanceof PDFArray) {
+      for (let i = 0; i < value.size(); i++) visit(value.get(i));
+      return;
+    }
+    if (value instanceof PDFDict) {
+      for (const child of value.values()) visit(child);
+      return;
+    }
+    if (value?.dict instanceof PDFDict) visit(value.dict);
+  };
+  for (const root of Object.values(doc.context.trailerInfo)) visit(root);
+  for (const [ref] of doc.context.enumerateIndirectObjects()) {
+    if (!reachable.has(ref)) doc.context.delete(ref);
+  }
+}
+
 // Bỏ /Names/EmbeddedFiles; /Names chỉ bị xoá khi không còn mục nào khác.
 // pdf-lib attach còn gắn cùng Filespec vào catalog /AF nên phải bỏ luôn,
 // nếu không tệp vẫn còn là "associated file" dù đã rời cây tên.
@@ -100,6 +128,7 @@ function removeEmbeddedFiles(doc) {
     }
     if (af.size() === 0) doc.catalog.delete(PDFName.of('AF'));
   }
+  if (count) gcUnreachable(doc);
   return count;
 }
 

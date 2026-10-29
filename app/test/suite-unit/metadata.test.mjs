@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const {
-  PDFDocument, PDFName, PDFString, PDFHexString,
+  PDFDocument, PDFName, PDFDict, PDFString, PDFHexString,
 } = require('pdf-lib');
 const { metadataTool } = require('../../suite/pdfops/metadata.js');
 const { runProcess } = require('../../suite/util/spawn.js');
@@ -47,6 +47,15 @@ function tempDir(t) {
 
 // Đọc output mà không để pdf-lib tự điền Producer/ModDate (updateMetadata).
 const loadOutput = file => PDFDocument.load(fs.readFileSync(file), { updateMetadata: false });
+
+// Loại của mọi object còn trong file kết quả, kể cả object mồ côi.
+async function objectTypes(file) {
+  const doc = await loadOutput(file);
+  return doc.context.enumerateIndirectObjects().map(([, obj]) => {
+    const dict = obj instanceof PDFDict ? obj : obj?.dict;
+    return dict instanceof PDFDict ? dict.get(PDFName.of('Type'))?.asString() : undefined;
+  }).filter(Boolean);
+}
 
 /**
  * PDF nhiều metadata: Info đầy đủ, XMP không nén, và các tệp đính kèm.
@@ -121,6 +130,9 @@ test('mặc định xoá Info, XMP và tệp đính kèm; báo cáo đúng số 
   const listed = await qpdf(['--list-attachments', out]);
   // qpdf in "has no embedded files" khi không còn tệp; chỉ cần không có tên tệp.
   assert.doesNotMatch(listed.stdout, /dinh-kem/);
+  const types = await objectTypes(out);
+  assert.equal(types.includes('/Filespec'), false, 'không còn object Filespec mồ côi');
+  assert.equal(types.includes('/EmbeddedFile'), false, 'không còn object EmbeddedFile mồ côi');
   await qpdf(['--check', out]);
   assert.deepEqual(fs.readdirSync(ctx.tempDir), [], 'không để lại file tạm');
 });
@@ -183,6 +195,9 @@ test('chỉ xoá tệp đính kèm: Info và XMP còn nguyên', async t => {
   assert.equal(doc.catalog.has(PDFName.of('AF')), false);
   const listed = await qpdf(['--list-attachments', out]);
   assert.doesNotMatch(listed.stdout, /dinh-kem/);
+  const types = await objectTypes(out);
+  assert.equal(types.includes('/Filespec'), false);
+  assert.equal(types.includes('/EmbeddedFile'), false);
 });
 
 test('xoá EmbeddedFiles nhưng giữ các mục khác trong /Names', async t => {
