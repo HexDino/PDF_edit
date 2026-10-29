@@ -6,6 +6,10 @@ import { createRequire } from 'node:module';
 import { APP_ROOT, OUT, electronBin, electronEnv, closeApp } from './_paths.mjs';
 
 const require = createRequire(import.meta.url);
+const { runProcess } = require('../suite/util/spawn.js');
+const { binaryPath } = require('../suite/util/paths.js');
+const qpdf = (args, opts = {}) =>
+  runProcess(binaryPath('qpdf.exe', { appRoot: APP_ROOT, isPackaged: false }), args, opts);
 
 const OUT_LABEL_DEFAULT = 'Cùng thư mục file gốc';
 const screenshotPath = path.join(OUT, 'suite-home.png');
@@ -31,15 +35,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 2);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 12);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 12);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 3);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 11);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 11);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'pdf-images'],
+    ['merge', 'pdf-images', 'protect'],
   );
-  console.log('home: 14 thẻ · 2 bật (merge, pdf-images) · 12 tắt · 12 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 3 bật (merge, pdf-images, protect) · 11 tắt · 11 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -131,6 +135,8 @@ try {
   await w.waitForFunction(() => location.hash === '' && !document.getElementById('homeView').hidden);
   assert.equal(await w.locator('#toolView').isVisible(), false);
   assert.equal(await w.locator('#toolGrid .card').count(), 3);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 1);
+  assert.deepEqual(await cardIds(w), ['protect', 'unlock', 'metadata']);
   assert.equal(await w.locator('#toolGrid .groupTitle').textContent(), 'Bảo mật');
   assert.equal(await w.locator('#nav .navItem.on').count(), 1);
   assert.equal(await w.locator('#nav .navItem.on').textContent(), 'Bảo mật');
@@ -236,6 +242,40 @@ try {
     assert.deepEqual([...bytes.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'PNG magic');
   }
   console.log('pdf-images ok:', imgFolder, imgNames.join(', '));
+
+  // 11. Khoá PDF: qpdf thật mã hoá AES-256; mật khẩu đúng mở được, sai bị từ chối.
+  const protectOut = path.join(OUT, 'm1b-protect-out');
+  fs.rmSync(protectOut, { recursive: true, force: true });
+  fs.mkdirSync(protectOut, { recursive: true });
+  await w.evaluate(() => window.__suite.openTool('protect'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'protect');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: imgSrc, out: protectOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ openPassword: 'secret', ownerPassword: 'owner', allowPrint: true, allowCopy: false, allowModify: false });
+  }, { file: imgSrc, out: protectOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const protectRes = await w.evaluate(() => window.__suite.waitJob(30000));
+  console.log('protect result:', JSON.stringify(protectRes));
+  if (!protectRes?.outputs?.length) throw new Error('Khoá PDF không tạo output: ' + JSON.stringify(protectRes));
+  assert.equal(protectRes.outputs.length, 1);
+  const locked = protectRes.outputs[0].path;
+  assert.equal(path.basename(locked), 'm1b-2pages-khoa.pdf');
+  assert.equal(path.dirname(path.resolve(locked)), path.resolve(protectOut));
+  assert.ok(fs.statSync(locked).size > 0, 'file khoá phải có dữ liệu');
+
+  const shown = await qpdf(['--show-encryption', '--password=secret', locked]);
+  assert.match(shown.stdout, /R = 6/);
+  assert.match(shown.stdout, /AESv3/);
+  assert.match(shown.stdout, /print low resolution: allowed/);
+  assert.match(shown.stdout, /extract for any purpose: not allowed/);
+  await assert.rejects(
+    qpdf(['--check', '--password=wrong', locked]),
+    e => e.exitCode !== 0,
+  );
+  console.log('protect ok:', locked);
 } finally {
   await closeApp(app);
 }
