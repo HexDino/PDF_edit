@@ -1,4 +1,5 @@
 import * as pdfjsLib from '../vendor/pdf.min.mjs';
+import { renderScale } from './render-scale.mjs';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.min.mjs', import.meta.url).href;
 
@@ -13,7 +14,9 @@ window.workerApi.onTask(async task => {
     for (let i = 0; i < task.pages.length; i++) {
       const n = task.pages[i];
       const page = await doc.getPage(n);
-      const vp = page.getViewport({ scale: task.dpi / 72 });
+      // Cạnh dài tối đa 10.000 px: hạ tỉ lệ thay vì tạo canvas quá lớn.
+      const base = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: renderScale(task.dpi, base.width, base.height) });
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.ceil(vp.width));
       canvas.height = Math.max(1, Math.ceil(vp.height));

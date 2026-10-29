@@ -7,14 +7,41 @@ const { outputName, publishUnique } = require('../util/paths');
 // Không bao giờ đưa nguyên văn stderr (có thể chứa đường dẫn) ra UI.
 const PASSWORD_RE = /invalid password|file is encrypted|password required/i;
 
+// qpdf trả mã 3 khi có cảnh báo nhưng vẫn tạo được file (vd. PDF hỏng nhẹ).
+// Chỉ chấp nhận mã 3 khi file tạm thực sự dùng được; còn lại vẫn là lỗi.
+function hasUsableOutput(file) {
+  try {
+    return fs.statSync(file).size > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function protect(ctx) {
   const file = ctx.files[0];
   const open = ctx.options.openPassword || '';
-  const owner = ctx.options.ownerPassword || open;
-  if (!open) throw new ToolError('INVALID_OPTIONS', 'Hãy nhập mật khẩu mở.');
-  if (/[\r\n]/.test(open) || /[\r\n]/.test(owner)) {
+  const ownerInput = ctx.options.ownerPassword || '';
+  const restricted = !ctx.options.allowPrint || !ctx.options.allowCopy || !ctx.options.allowModify;
+
+  // Mật khẩu mở có thể trống khi đã có mật khẩu chủ (chế độ chỉ chủ).
+  if (!open && !ownerInput) {
+    throw new ToolError('INVALID_OPTIONS', 'Hãy nhập mật khẩu mở hoặc mật khẩu chủ.');
+  }
+  // Có hạn chế quyền thì mật khẩu chủ phải riêng, nếu không người nhận dùng
+  // chính mật khẩu mở để gỡ hạn chế.
+  if (restricted) {
+    if (!ownerInput) {
+      throw new ToolError('INVALID_OPTIONS', 'Cần mật khẩu chủ khi hạn chế quyền.');
+    }
+    if (ownerInput === open) {
+      throw new ToolError('INVALID_OPTIONS', 'Mật khẩu chủ phải khác mật khẩu mở.');
+    }
+  }
+  if (/[\r\n]/.test(open) || /[\r\n]/.test(ownerInput)) {
     throw new ToolError('INVALID_OPTIONS', 'Mật khẩu không hợp lệ.');
   }
+  // Không hạn chế quyền: mật khẩu chủ trống được phép dùng chung với mật khẩu mở.
+  const owner = ownerInput || open;
 
   const tmp = path.join(ctx.tempDir, 'protected.pdf');
   const argFile = path.join(ctx.tempDir, 'qpdf-args.txt');
@@ -44,16 +71,19 @@ async function protect(ctx) {
     await ctx.qpdf(['@' + argFile]);
   } catch (e) {
     if (e.code === 'CANCELLED') throw e;
-    if (PASSWORD_RE.test(`${e.stderr || ''} ${e.message || ''}`)) {
-      throw new ToolError('PASSWORD_REQUIRED', 'PDF đã được mã hoá; cần mở khoá trước khi đặt mật khẩu mới.');
+    // qpdf exit code 3 = chỉ có cảnh báo; file tạm vẫn dùng được.
+    if (!(e.exitCode === 3 && hasUsableOutput(tmp))) {
+      if (PASSWORD_RE.test(`${e.stderr || ''} ${e.message || ''}`)) {
+        throw new ToolError('PASSWORD_REQUIRED', 'PDF đã được mã hoá; cần mở khoá trước khi đặt mật khẩu mới.');
+      }
+      throw new ToolError('INTERNAL', 'Không khoá được PDF.');
     }
-    throw new ToolError('INTERNAL', 'Không khoá được PDF.');
   } finally {
     try { fs.rmSync(argFile, { force: true }); } catch { /* temp sẽ được job dọn dẹp */ }
   }
 
   ctx.signal?.throwIfAborted?.();
-  if (!fs.existsSync(tmp)) throw new ToolError('INTERNAL', 'qpdf không tạo được file.');
+  if (!hasUsableOutput(tmp)) throw new ToolError('INTERNAL', 'qpdf không tạo được file.');
   const outDir = ctx.outputDir || path.dirname(file);
   const out = publishUnique(tmp, outDir, outputName(file, 'khoa'));
   return { outputs: [{ path: out }], errors: [], stats: {} };

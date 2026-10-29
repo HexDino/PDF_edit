@@ -19,9 +19,9 @@ const TOOLS = [
   { id: 'images-pdf', group: 'convert', title: 'Ảnh → PDF', description: 'Ghép ảnh thành một PDF theo thứ tự.', icon: '🖼', accept: ['.png', '.jpg', '.jpeg'], multiple: true, minFiles: 1, status: 'planned', options: [] },
   { id: 'html-pdf', group: 'convert', title: 'HTML → PDF', description: 'In file HTML local thành PDF.', icon: '⟨/⟩', accept: ['.html', '.htm'], multiple: false, status: 'planned', options: [] },
   { id: 'compress', group: 'optimize', title: 'Nén PDF', description: 'Giảm dung lượng, có cảnh báo mất lớp chữ.', icon: '🗜', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
-  { id: 'protect', group: 'security', title: 'Khoá PDF', description: 'Đặt mật khẩu mở và hạn chế quyền.', icon: '🔒', accept: ['.pdf'], multiple: false, status: 'available', options: [
-    { key: 'openPassword', type: 'password', label: 'Mật khẩu mở', required: true },
-    { key: 'ownerPassword', type: 'password', label: 'Mật khẩu chủ (trống = trùng mật khẩu mở)' },
+  { id: 'protect', group: 'security', title: 'Khoá PDF', description: 'Đặt mật khẩu mở/chủ và hạn chế quyền.', icon: '🔒', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'openPassword', type: 'password', default: '', label: 'Mật khẩu mở (trống = chỉ mở bằng mật khẩu chủ)' },
+    { key: 'ownerPassword', type: 'password', default: '', label: 'Mật khẩu chủ (bắt buộc khi hạn chế quyền)', placeholder: 'Trùng mật khẩu mở nếu không hạn chế' },
     { key: 'allowPrint', type: 'bool', default: true, label: 'Cho phép in' },
     { key: 'allowCopy', type: 'bool', default: false, label: 'Cho phép sao chép' },
     { key: 'allowModify', type: 'bool', default: false, label: 'Cho phép sửa' },

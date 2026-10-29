@@ -14,6 +14,10 @@ const qpdf = (args, opts = {}) =>
 const OUT_LABEL_DEFAULT = 'Cùng thư mục file gốc';
 const screenshotPath = path.join(OUT, 'suite-home.png');
 const cardIds = w => w.$$eval('#toolGrid .card', els => els.map(el => el.dataset.toolId));
+const pngSize = buf => {
+  assert.deepEqual([...buf.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 'PNG signature');
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+};
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -180,6 +184,11 @@ try {
     for (let i = 0; i < n; i++) d.addPage([100 + i, 200]);
     fs.writeFileSync(file, await d.save());
   }
+  async function makeSized(file, sizes) {
+    const d = await PDFDocument.create();
+    for (const [width, height] of sizes) d.addPage([width, height]);
+    fs.writeFileSync(file, await d.save());
+  }
   await make(a, 2); await make(b, 3);
 
   await w.evaluate(() => window.__suite.openTool('merge'));
@@ -241,7 +250,91 @@ try {
     assert.ok(bytes.length > 0, `${path.basename(o.path)} phải có dữ liệu`);
     assert.deepEqual([...bytes.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'PNG magic');
   }
-  console.log('pdf-images ok:', imgFolder, imgNames.join(', '));
+  // Fixture 72 DPI: trang 1 rộng 100 pt × cao 200 pt → 100×200 px.
+  assert.deepEqual(imgRes.outputs.map(o => pngSize(fs.readFileSync(o.path))), [
+    { width: 100, height: 200 },
+    { width: 101, height: 200 },
+  ]);
+  console.log('pdf-images ok:', imgFolder, imgNames.join(', '), '· 100×200 px @72 DPI');
+
+  // 10b. PDF → ảnh JPEG thật: magic FF D8 FF.
+  const jpgOut = path.join(OUT, 'm1b-img-jpg-out');
+  fs.rmSync(jpgOut, { recursive: true, force: true });
+  fs.mkdirSync(jpgOut, { recursive: true });
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: imgSrc, out: jpgOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pages: '', dpi: 72, format: 'jpg', quality: 80 });
+  }, { file: imgSrc, out: jpgOut });
+  await w.click('#runBtn');
+  const jpgRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('pdf-images jpg result:', JSON.stringify(jpgRes));
+  if (!jpgRes?.outputs?.length) throw new Error('PDF → JPEG không tạo output: ' + JSON.stringify(jpgRes));
+  assert.deepEqual(jpgRes.outputs.map(o => path.basename(o.path)), ['m1b-2pages-01.jpg', 'm1b-2pages-02.jpg']);
+  assert.equal(path.basename(path.dirname(jpgRes.outputs[0].path)), 'm1b-2pages-anh');
+  for (const o of jpgRes.outputs) {
+    const bytes = fs.readFileSync(o.path);
+    assert.ok(bytes.length > 0);
+    assert.deepEqual([...bytes.subarray(0, 3)], [0xff, 0xd8, 0xff], 'JPEG magic FF D8 FF');
+  }
+  console.log('pdf-images jpg ok:', jpgRes.outputs.map(o => path.basename(o.path)).join(', '));
+
+  // 10c. Cạnh dài tối đa 10.000 px: trang 2000×100 pt ở 600 DPI → 10000×500.
+  const capSrc = path.join(OUT, 'm1b-wide.pdf');
+  const capOut = path.join(OUT, 'm1b-cap-out');
+  fs.rmSync(capOut, { recursive: true, force: true });
+  fs.mkdirSync(capOut, { recursive: true });
+  await makeSized(capSrc, [[2000, 100]]);
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: capSrc, out: capOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pages: '', dpi: 600, format: 'png', quality: 90 });
+  }, { file: capSrc, out: capOut });
+  await w.click('#runBtn');
+  const capRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('pdf-images 10k result:', JSON.stringify(capRes));
+  if (!capRes?.outputs?.length) throw new Error('PDF → ảnh quá khổ không tạo output: ' + JSON.stringify(capRes));
+  assert.equal(capRes.outputs.length, 1);
+  assert.equal(path.basename(capRes.outputs[0].path), 'm1b-wide-01.png');
+  assert.deepEqual(pngSize(fs.readFileSync(capRes.outputs[0].path)), { width: 10000, height: 500 });
+  console.log('pdf-images 10k ok: cạnh dài 10000 px (600 DPI bị hạ tỉ lệ)');
+
+  // 10d. Huỷ giữa lúc render nhiều trang: không tạo thư mục -anh, lần sau vẫn render được.
+  const cancelSrc = path.join(OUT, 'm1b-many.pdf');
+  const cancelOut = path.join(OUT, 'm1b-cancel-out');
+  fs.rmSync(cancelOut, { recursive: true, force: true });
+  fs.mkdirSync(cancelOut, { recursive: true });
+  await makeSized(cancelSrc, Array.from({ length: 16 }, () => [600, 800]));
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: cancelSrc, out: cancelOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pages: '', dpi: 300, format: 'png', quality: 90 });
+  }, { file: cancelSrc, out: cancelOut });
+  await w.click('#runBtn');
+  await w.waitForFunction(() => Number(document.getElementById('progressBar').value) >= 1, null, { timeout: 60000 });
+  assert.equal(await w.evaluate(() => window.__suite.state.running), true, 'job phải còn chạy khi huỷ');
+  await w.click('#cancelBtn');
+  await w.waitForFunction(() => window.__suite.state.running === false, null, { timeout: 30000 });
+  const cancelRes = await w.evaluate(() => window.__suite.waitJob(5000));
+  assert.equal(cancelRes, null, 'job huỷ không được trả kết quả/lỗi');
+  assert.match(await w.locator('#toast').textContent(), /Đã huỷ job/);
+  assert.equal(fs.existsSync(path.join(cancelOut, 'm1b-many-anh')), false, 'huỷ không được để lại thư mục -anh');
+  assert.deepEqual(fs.readdirSync(cancelOut), [], 'thư mục xuất phải trống sau khi huỷ');
+  console.log('pdf-images cancel ok: không có -anh, thư mục xuất trống');
+
+  // Worker bị reset khi huỷ; lần render sau phải khởi động lại và thành công.
+  await w.evaluate(() => window.__suite.setOptions({ pages: '1', dpi: 72, format: 'png', quality: 90 }));
+  await w.click('#runBtn');
+  const retryRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('pdf-images retry result:', JSON.stringify(retryRes));
+  if (!retryRes?.outputs?.length) throw new Error('Render lại sau huỷ thất bại: ' + JSON.stringify(retryRes));
+  assert.equal(retryRes.outputs.length, 1);
+  assert.equal(path.basename(retryRes.outputs[0].path), 'm1b-many-01.png');
+  assert.deepEqual(pngSize(fs.readFileSync(retryRes.outputs[0].path)), { width: 600, height: 800 });
+  console.log('pdf-images retry ok:', retryRes.outputs[0].path);
 
   // 11. Khoá PDF: qpdf thật mã hoá AES-256; mật khẩu đúng mở được, sai bị từ chối.
   const protectOut = path.join(OUT, 'm1b-protect-out');
@@ -249,6 +342,11 @@ try {
   fs.mkdirSync(protectOut, { recursive: true });
   await w.evaluate(() => window.__suite.openTool('protect'));
   await w.waitForFunction(() => window.__suite.state.tool?.id === 'protect');
+  assert.ok(
+    (await w.$$eval('#options .field > label', els => els.map(el => el.textContent)))
+      .some(t => /Mật khẩu chủ/.test(t) && /bắt buộc/.test(t)),
+    'nhãn mật khẩu chủ phải nói bắt buộc khi hạn chế quyền',
+  );
   await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: imgSrc, out: protectOut });
   await w.evaluate(({ file, out }) => {
     window.__suite.addFiles([file]);
@@ -269,13 +367,20 @@ try {
   const shown = await qpdf(['--show-encryption', '--password=secret', locked]);
   assert.match(shown.stdout, /R = 6/);
   assert.match(shown.stdout, /AESv3/);
+  assert.match(shown.stdout, /User password = secret/);
+  assert.match(shown.stdout, /Supplied password is user password/);
+  assert.equal(shown.stdout.includes('Supplied password is owner password'), false,
+    'mật khẩu mở không được là mật khẩu chủ');
   assert.match(shown.stdout, /print low resolution: allowed/);
   assert.match(shown.stdout, /extract for any purpose: not allowed/);
+  assert.match(shown.stdout, /modify anything: not allowed/);
+  const asOwner = await qpdf(['--show-encryption', '--password=owner', locked]);
+  assert.match(asOwner.stdout, /Supplied password is owner password/);
   await assert.rejects(
     qpdf(['--check', '--password=wrong', locked]),
     e => e.exitCode !== 0,
   );
-  console.log('protect ok:', locked);
+  console.log('protect ok:', locked, '· mở = user, chủ = owner, in được; sao chép/sửa bị chặn');
 } finally {
   await closeApp(app);
 }

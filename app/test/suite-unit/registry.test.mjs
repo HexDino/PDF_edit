@@ -22,6 +22,11 @@ test('merge khả dụng, các công cụ khác đang chờ', () => {
   assert.equal(tools.find(t => t.id === 'merge').status, 'available');
   assert.ok(tools.filter(t => t.status === 'planned').length >= 10);
 });
+test('protect nói rõ mật khẩu chủ bắt buộc khi hạn chế quyền', () => {
+  const p = listTools().find(t => t.id === 'protect');
+  const owner = p.options.find(o => o.key === 'ownerPassword');
+  assert.match(owner.label, /bắt buộc/i);
+});
 test('không lộ hàm run qua IPC', () => {
   for (const t of listTools()) assert.equal(t.run, undefined);
 });

@@ -20,6 +20,10 @@ app/test/smoke.png
 app/test/smoke-asar.png
 app/test/test/
 
+# Thư mục build kiểm tra cục bộ (không commit)
+app/dist-check/
+app/dist-m1b/
+
 # OS & editor
 .DS_Store
 Thumbs.db
