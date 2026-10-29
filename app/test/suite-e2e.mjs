@@ -178,7 +178,9 @@ try {
   const a = path.join(OUT, 'm1a-a.pdf'), b = path.join(OUT, 'm1a-b.pdf'), outDir = path.join(OUT, 'm1a-out');
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
-  const { PDFDocument, PDFName } = require('pdf-lib');
+  const {
+    PDFDocument, PDFName, PDFString,
+  } = require('pdf-lib');
   async function make(file, n) {
     const d = await PDFDocument.create();
     for (let i = 0; i < n; i++) d.addPage([100 + i, 200]);
@@ -561,10 +563,19 @@ try {
   metaDoc.setAuthor('Nguyễn Văn A');
   metaDoc.setSubject('Chủ đề mật');
   metaDoc.setKeywords(['mật', 'nội bộ']);
+  metaDoc.setCreationDate(new Date('2019-01-02T03:04:05Z'));
+  metaDoc.setModificationDate(new Date('2020-02-03T04:05:06Z'));
+  metaDoc.getInfoDict().set(PDFName.of('Company'), PDFString.of('SECRET-COMPANY-E2E'));
   const metaXmp = '<x:xmpmeta xmlns:x="adobe:ns:meta/">SECRET-XMP-E2E</x:xmpmeta>';
   metaDoc.catalog.set(
     PDFName.of('Metadata'),
     metaDoc.context.register(metaDoc.context.stream(metaXmp, { Type: 'Metadata', Subtype: 'XML' })),
+  );
+  // XMP cấp trang: cũng phải bị xoá khi chọn removeXmp.
+  const pageXmp = '<x:xmpmeta xmlns:x="adobe:ns:meta/">SECRET-PAGE-XMP-E2E</x:xmpmeta>';
+  metaDoc.getPage(0).node.set(
+    PDFName.of('Metadata'),
+    metaDoc.context.register(metaDoc.context.stream(pageXmp, { Type: 'Metadata', Subtype: 'XML' })),
   );
   await metaDoc.attach(Buffer.from('tệp đính kèm bí mật'), 'bi-mat.txt', { mimeType: 'text/plain' });
   fs.writeFileSync(metaSrc, await metaDoc.save());
@@ -599,17 +610,28 @@ try {
   assert.ok(fs.statSync(metaFile).size > 0, 'file xoá metadata phải có dữ liệu');
   const cleanedDoc = await PDFDocument.load(fs.readFileSync(metaFile), { updateMetadata: false });
   assert.equal(cleanedDoc.getPageCount(), 1);
-  assert.equal(cleanedDoc.getTitle(), '');
-  assert.equal(cleanedDoc.getAuthor(), '');
-  assert.equal(cleanedDoc.getSubject(), '');
-  assert.equal(cleanedDoc.getKeywords(), '');
+  // Info phải vắng hẳn: ngày tạo/ngày sửa và khoá tuỳ biến không được còn.
+  assert.equal(cleanedDoc.context.trailerInfo.Info, undefined, 'trailer không còn /Info');
+  assert.equal(cleanedDoc.getCreationDate(), undefined, 'CreationDate phải bị xoá');
+  assert.equal(cleanedDoc.getModificationDate(), undefined, 'ModDate phải bị xoá');
+  assert.equal(cleanedDoc.getInfoDict().get(PDFName.of('Company')), undefined, '/Company phải bị xoá');
+  assert.equal(cleanedDoc.getTitle(), undefined);
+  assert.equal(cleanedDoc.getAuthor(), undefined);
+  assert.equal(cleanedDoc.getSubject(), undefined);
+  assert.equal(cleanedDoc.getKeywords(), undefined);
   assert.equal(cleanedDoc.catalog.has(PDFName.of('Metadata')), false);
+  assert.equal(cleanedDoc.getPage(0).node.has(PDFName.of('Metadata')), false, 'trang không còn /Metadata');
   assert.equal(cleanedDoc.catalog.has(PDFName.of('AF')), false);
-  assert.equal(fs.readFileSync(metaFile).includes(Buffer.from('SECRET-XMP-E2E')), false);
+  const metaBytes = fs.readFileSync(metaFile);
+  for (const marker of [
+    'SECRET-XMP-E2E', 'SECRET-PAGE-XMP-E2E', '/Company', 'SECRET-COMPANY-E2E', '/CreationDate', '/ModDate',
+  ]) {
+    assert.equal(metaBytes.includes(Buffer.from(marker)), false, `không còn ${marker} trong file`);
+  }
   const metaList = await qpdf(['--list-attachments', metaFile]);
   assert.doesNotMatch(metaList.stdout, /bi-mat\.txt/);
   await qpdf(['--check', metaFile]);
-  console.log('metadata ok:', metaFile, '· Info rỗng, không còn tệp đính kèm');
+  console.log('metadata ok:', metaFile, '· Info/ngày/khoá tuỳ biến đã xoá hẳn, không còn tệp đính kèm');
 } finally {
   await closeApp(app);
 }

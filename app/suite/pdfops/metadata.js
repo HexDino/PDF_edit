@@ -32,29 +32,40 @@ async function loadPdf(file) {
   }
 }
 
+// Xoá cả dictionary Info khỏi trailer thay vì chỉ làm rỗng vài trường: ngày
+// tạo/ngày sửa và các khoá tuỳ biến (/Company…) cũng là dữ liệu nhận dạng.
+// Trả về true nếu file gốc thực sự có Info.
 function clearInfo(doc) {
-  doc.setTitle('');
-  doc.setAuthor('');
-  doc.setSubject('');
-  doc.setCreator('');
-  doc.setProducer('');
-  doc.setKeywords([]);
+  const info = doc.context.trailerInfo.Info;
+  if (info === undefined) return false;
+  delete doc.context.trailerInfo.Info;
+  if (info instanceof PDFRef) doc.context.delete(info);
+  return true;
 }
 
-// XMP là một stream gắn ở catalog. Xoá tham chiếu rồi xoá luôn object để
-// pdf-lib không ghi lại gói XMP đã tách rời vào file kết quả.
-function removeXmp(doc) {
-  const key = PDFName.of('Metadata');
-  if (!doc.catalog.has(key)) return false;
-  const value = doc.catalog.get(key);
-  doc.catalog.delete(key);
+// Bỏ /Metadata khỏi một dictionary (catalog hoặc trang) và xoá luôn stream
+// object để gói XMP không bị ghi lại dưới dạng object mồ côi.
+function removeMetadata(doc, dict, key) {
+  if (!dict.has(key)) return false;
+  const value = dict.get(key);
+  dict.delete(key);
   if (value instanceof PDFRef) doc.context.delete(value);
   return true;
 }
 
+// XMP có thể nằm ở catalog (chuẩn) và cả ở từng trang. Phải quét cả hai.
+function removeXmp(doc) {
+  const key = PDFName.of('Metadata');
+  let removed = removeMetadata(doc, doc.catalog, key);
+  for (const page of doc.getPages()) {
+    if (removeMetadata(doc, page.node, key)) removed = true;
+  }
+  return removed;
+}
+
 // Đếm tệp trong cây tên /EmbeddedFiles (gồm cả nút con /Kids) và ghi lại
-// tham chiếu Filespec để dọn các mục /AF tương ứng ở catalog.
-function collectNameTree(node, refs, seen = new Set()) {
+// các Filespec để đối chiếu, tránh đếm trùng với catalog /AF.
+function collectNameTree(node, entries, seen = new Set()) {
   if (!node || seen.has(node)) return 0;
   seen.add(node);
   let count = 0;
@@ -63,14 +74,14 @@ function collectNameTree(node, refs, seen = new Set()) {
     count += Math.floor(names.size() / 2);
     for (let i = 1; i < names.size(); i += 2) {
       const value = names.get(i);
-      if (value instanceof PDFRef) refs.add(value);
+      if (value instanceof PDFRef || value instanceof PDFDict) entries.add(value);
     }
   }
   const kids = node.lookupMaybe(PDFName.of('Kids'), PDFArray);
   if (kids) {
     for (let i = 0; i < kids.size(); i++) {
       const kid = kids.lookupMaybe(i, PDFDict);
-      if (kid) count += collectNameTree(kid, refs, seen);
+      if (kid) count += collectNameTree(kid, entries, seen);
     }
   }
   return count;
@@ -106,29 +117,37 @@ function gcUnreachable(doc) {
 
 // Bỏ /Names/EmbeddedFiles; /Names chỉ bị xoá khi không còn mục nào khác.
 // pdf-lib attach còn gắn cùng Filespec vào catalog /AF nên phải bỏ luôn,
-// nếu không tệp vẫn còn là "associated file" dù đã rời cây tên.
+// nếu không tệp vẫn còn là "associated file" dù đã rời cây tên. /AF có thể
+// tồn tại một mình (không có /Names/EmbeddedFiles) nên xử lý độc lập.
 function removeEmbeddedFiles(doc) {
   const names = doc.catalog.lookupMaybe(PDFName.of('Names'), PDFDict);
-  if (!names) return 0;
   const key = PDFName.of('EmbeddedFiles');
-  const refs = new Set();
+  const entries = new Set();
   let count = 0;
-  const embedded = names.lookupMaybe(key, PDFDict);
-  if (embedded) {
-    count = collectNameTree(embedded, refs);
-    names.delete(key);
+  if (names) {
+    const embedded = names.lookupMaybe(key, PDFDict);
+    if (embedded) {
+      count = collectNameTree(embedded, entries);
+      names.delete(key);
+    }
+    if (names.keys().length === 0) doc.catalog.delete(PDFName.of('Names'));
   }
-  if (names.keys().length === 0) doc.catalog.delete(PDFName.of('Names'));
 
+  // Xoá toàn bộ /AF ở catalog; mục /AF không có trong cây tên vẫn là tệp
+  // đính kèm và phải được đếm (không đếm trùng mục đã có trong cây tên).
   const af = doc.catalog.lookupMaybe(PDFName.of('AF'), PDFArray);
-  if (af && refs.size) {
+  if (af) {
     for (let i = af.size() - 1; i >= 0; i--) {
       const value = af.get(i);
-      if (value instanceof PDFRef && refs.has(value)) af.remove(i);
+      if (value instanceof PDFRef || value instanceof PDFDict) {
+        if (!entries.has(value)) {
+          entries.add(value);
+          count += 1;
+        }
+      }
     }
-    if (af.size() === 0) doc.catalog.delete(PDFName.of('AF'));
+    doc.catalog.delete(PDFName.of('AF'));
   }
-  if (count) gcUnreachable(doc);
   return count;
 }
 
@@ -146,9 +165,12 @@ async function metadataTool(ctx) {
   ctx.signal.throwIfAborted();
 
   ctx.progress('processing', 0, 1, 'Đang xoá metadata…');
-  if (removeInfo) clearInfo(doc);
+  const infoRemoved = removeInfo ? clearInfo(doc) : false;
   const xmpRemoved = removeXmpFlag ? removeXmp(doc) : false;
   const attachmentsRemoved = removeAttachments ? removeEmbeddedFiles(doc) : 0;
+  // Dọn object mồ côi (Info/giá trị Info, Filespec, EmbeddedFile…) để dữ
+  // liệu đã xoá không còn nằm trong file kết quả dưới dạng object tách rời.
+  if (infoRemoved || attachmentsRemoved) gcUnreachable(doc);
   ctx.signal.throwIfAborted();
 
   const tmp = path.join(ctx.tempDir, 'metadata.pdf');
@@ -164,7 +186,7 @@ async function metadataTool(ctx) {
     outputs: [{ path: out }],
     errors: [],
     stats: {
-      removed: { info: removeInfo, xmp: xmpRemoved, attachments: attachmentsRemoved },
+      removed: { info: infoRemoved, xmp: xmpRemoved, attachments: attachmentsRemoved },
     },
   };
 }
