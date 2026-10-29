@@ -8,6 +8,7 @@ const { ToolError, toPayload } = require('./suite/errors');
 const { binaryPath } = require('./suite/util/paths');
 const { runProcess, killAllChildren } = require('./suite/util/spawn');
 const { createLogger } = require('./suite/util/log');
+const { registerRenderProtocol, pdfToImages, destroyRenderWorker } = require('./suite/render-worker');
 
 const RENDERER = path.join(__dirname, 'renderer');
 // Tên nội bộ ASCII: tên có dấu lọt vào User-Agent làm hỏng mọi yêu cầu tải tài nguyên
@@ -16,9 +17,11 @@ app.userAgentFallback = app.userAgentFallback.replace(/[^\x20-\x7e]/g, '');
 app.setPath('userData', path.join(app.getPath('appData'), 'TrinhSuaPDF'));
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  { scheme: 'pdfsrc', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
 
 let win = null;
+let quitting = false;
 let currentEntry = 'index.html';
 let dirty = false;
 let pendingFile = pdfFromArgv(process.argv);
@@ -133,6 +136,7 @@ else {
         return new Response(body, { headers: { 'content-type': MIME[path.extname(p).toLowerCase()] || 'application/octet-stream' } });
       } catch { return new Response('not found', { status: 404 }); }
     });
+    registerRenderProtocol();
     let healthCache = null;
     ipcMain.handle('suite:tools', guarded(() => listTools()));
     ipcMain.handle('suite:health', guarded(async () => {
@@ -185,6 +189,7 @@ else {
       }),
       tempRoot: path.join(app.getPath('temp'), 'TrinhSuaPDF', 'jobs'),
       log,
+      render: { pdfToImages },
       onEvent: ev => { if (win && !win.isDestroyed()) win.webContents.send('suite:job-event', ev); },
     });
     ipcMain.handle('suite:job-start', (event, req) => {
@@ -202,7 +207,7 @@ else {
   });
   app.on('window-all-closed', () => app.quit());
   // Dừng qpdf/tiến trình con còn sống trước khi thoát (không để orphan trên Windows).
-  app.on('before-quit', () => { killAllChildren(); });
+  app.on('before-quit', () => { quitting = true; destroyRenderWorker(); killAllChildren(); });
 }
 
 function startEntry() {
@@ -236,6 +241,13 @@ function createWindow() {
   loadEntry(startEntry());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', e => e.preventDefault());
+  // Worker render là cửa sổ ẩn duy nhất ngoài win; đóng win phải dọn nó và
+  // thoát hẳn — window-all-closed không tự phát khi worker bị destroy sau đó.
+  win.on('closed', () => {
+    win = null;
+    destroyRenderWorker();
+    if (!quitting) app.quit();
+  });
   win.on('close', e => {
     if (!dirty) return;
     const r = dialog.showMessageBoxSync(win, {

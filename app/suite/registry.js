@@ -1,4 +1,5 @@
 const { merge } = require('./pdfops/organize');
+const { pdfImages } = require('./pdfops/convert');
 
 const TOOLS = [
   { id: 'merge', group: 'organize', title: 'Ghép PDF', description: 'Ghép nhiều file thành một, đổi được thứ tự.', icon: '⧉', accept: ['.pdf'], multiple: true, minFiles: 2, status: 'available', options: [], run: merge },
@@ -8,7 +9,12 @@ const TOOLS = [
   { id: 'crop', group: 'organize', title: 'Crop PDF', description: 'Cắt lề trang theo khung tuỳ chọn.', icon: '⌗', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'stamp', group: 'stamp', title: 'Số trang & header/footer', description: 'Đánh số trang và chèn tiêu đề/chân trang.', icon: '#', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
   { id: 'watermark', group: 'stamp', title: 'Watermark', description: 'Chèn chữ hoặc ảnh mờ lên trang.', icon: '◈', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
-  { id: 'pdf-images', group: 'convert', title: 'PDF → ảnh', description: 'Xuất từng trang thành JPG hoặc PNG.', icon: '🖼', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },
+  { id: 'pdf-images', group: 'convert', title: 'PDF → ảnh', description: 'Xuất từng trang thành JPG hoặc PNG.', icon: '🖼', accept: ['.pdf'], multiple: false, status: 'available', options: [
+    { key: 'pages', type: 'range', label: 'Khoảng trang', placeholder: '1-3,5,8- (trống = tất cả)' },
+    { key: 'dpi', type: 'int', min: 72, max: 600, default: 150, label: 'DPI' },
+    { key: 'format', type: 'enum', values: ['jpg', 'png'], labels: { jpg: 'JPG — nhẹ hơn', png: 'PNG — nét hơn' }, default: 'jpg', label: 'Định dạng' },
+    { key: 'quality', type: 'int', min: 60, max: 100, default: 90, label: 'Chất lượng JPEG (%)' },
+  ], run: pdfImages },
   { id: 'images-pdf', group: 'convert', title: 'Ảnh → PDF', description: 'Ghép ảnh thành một PDF theo thứ tự.', icon: '🖼', accept: ['.png', '.jpg', '.jpeg'], multiple: true, minFiles: 1, status: 'planned', options: [] },
   { id: 'html-pdf', group: 'convert', title: 'HTML → PDF', description: 'In file HTML local thành PDF.', icon: '⟨/⟩', accept: ['.html', '.htm'], multiple: false, status: 'planned', options: [] },
   { id: 'compress', group: 'optimize', title: 'Nén PDF', description: 'Giảm dung lượng, có cảnh báo mất lớp chữ.', icon: '🗜', accept: ['.pdf'], multiple: false, status: 'planned', options: [] },

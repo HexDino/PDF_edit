@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { binaryPath, outputName, uniquePath, moveAtomic, publishUnique } = require('../../suite/util/paths.js');
+const { binaryPath, outputName, uniquePath, uniqueDir, moveAtomic, publishUnique } = require('../../suite/util/paths.js');
 
 test('đặt tên đầu ra', () => {
   assert.equal(outputName('D:/a/ho-so.pdf', 'ghep'), 'ho-so-ghep.pdf');
@@ -39,6 +39,12 @@ test('publishUnique giữ file cũ và lùi tên (2)', () => {
   assert.equal(fs.readFileSync(path.join(dir, 'a-ghep.pdf'), 'utf8'), 'nội dung cũ');
   assert.equal(fs.readFileSync(out, 'utf8'), 'nội dung mới');
   assert.equal(fs.existsSync(tmp), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+test('uniqueDir lùi tên khi đã tồn tại', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tsp-dir-'));
+  fs.mkdirSync(path.join(dir, 'a-anh'));
+  assert.equal(path.basename(uniqueDir(dir, 'a-anh')), 'a-anh (2)');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 test('publishUnique hai lần cùng tên tạo hai file khác nội dung', () => {

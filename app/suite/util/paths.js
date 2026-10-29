@@ -28,6 +28,16 @@ function uniquePath(dir, name, exists = fs.existsSync) {
   throw new Error('Không tìm được tên file trống');
 }
 
+function uniqueDir(dir, name, exists = fs.existsSync) {
+  let candidate = path.join(dir, name);
+  if (!exists(candidate)) return candidate;
+  for (let i = 2; i < 10000; i++) {
+    candidate = path.join(dir, `${name} (${i})`);
+    if (!exists(candidate)) return candidate;
+  }
+  throw new Error('Không tìm được tên thư mục trống');
+}
+
 function moveAtomic(src, dst) {
   fs.mkdirSync(path.dirname(dst), { recursive: true });
   try {
@@ -62,4 +72,4 @@ function publishUnique(tempFile, dir, proposedName) {
   throw new Error('Không tìm được tên file trống');
 }
 
-module.exports = { binaryPath, splitExt, outputName, uniquePath, moveAtomic, publishUnique };
+module.exports = { binaryPath, splitExt, outputName, uniquePath, uniqueDir, moveAtomic, publishUnique };

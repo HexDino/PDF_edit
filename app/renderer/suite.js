@@ -322,6 +322,7 @@ window.__suite = {
   addFiles,
   registerInput: async paths => { if (S?.registerInput) await S.registerInput(paths); },
   setOutputDir: p => applyOutputDir(p),
+  setOptions: partial => { Object.assign(state.options, partial); renderOptions(); },
   run,
   waitJob: (ms = 30000) => new Promise((resolve, reject) => {
     const t0 = Date.now();

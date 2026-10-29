@@ -31,15 +31,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 1);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 13);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 13);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 2);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 12);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 12);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
-  assert.equal(
-    await w.locator('#toolGrid .card:not([disabled])').getAttribute('data-tool-id'),
-    'merge',
+  assert.deepEqual(
+    await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
+    ['merge', 'pdf-images'],
   );
-  console.log('home: 14 thẻ · 1 bật (merge) · 13 tắt · 13 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 2 bật (merge, pdf-images) · 12 tắt · 12 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -205,6 +205,37 @@ try {
   assert.equal(rejected.job.error.message.includes(unregistered), false);
   assert.equal(rejected.reveal, false);
   console.log('allowlist: từ chối file chưa đăng ký · không lộ đường dẫn');
+
+  // 10. PDF → ảnh: worker pdf.js thật render 2 trang thành PNG trong thư mục -anh.
+  const imgSrc = path.join(OUT, 'm1b-2pages.pdf');
+  const imgOut = path.join(OUT, 'm1b-img-out');
+  fs.rmSync(imgOut, { recursive: true, force: true });
+  fs.mkdirSync(imgOut, { recursive: true });
+  await make(imgSrc, 2);
+  await w.evaluate(() => window.__suite.openTool('pdf-images'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'pdf-images');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: imgSrc, out: imgOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ pages: '', dpi: 72, format: 'png', quality: 90 });
+  }, { file: imgSrc, out: imgOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const imgRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('pdf-images result:', JSON.stringify(imgRes));
+  if (!imgRes?.outputs?.length) throw new Error('PDF → ảnh không tạo output: ' + JSON.stringify(imgRes));
+  assert.equal(imgRes.outputs.length, 2);
+  const imgNames = imgRes.outputs.map(o => path.basename(o.path));
+  assert.deepEqual(imgNames, ['m1b-2pages-01.png', 'm1b-2pages-02.png']);
+  const imgFolder = path.dirname(imgRes.outputs[0].path);
+  assert.equal(path.basename(imgFolder), 'm1b-2pages-anh');
+  for (const o of imgRes.outputs) {
+    const bytes = fs.readFileSync(o.path);
+    assert.ok(bytes.length > 0, `${path.basename(o.path)} phải có dữ liệu`);
+    assert.deepEqual([...bytes.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'PNG magic');
+  }
+  console.log('pdf-images ok:', imgFolder, imgNames.join(', '));
 } finally {
   await closeApp(app);
 }
