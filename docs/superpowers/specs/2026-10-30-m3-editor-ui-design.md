@@ -150,7 +150,8 @@ Kích thước:
 1. **Pointerdown guard**: hiện `document.querySelector('header').addEventListener('pointerdown', …)` chỉ bảo vệ header. Bọc top bar + rail + inspector trong `<div id="chrome">` và đổi selector sang `#chrome` để giữ vùng chọn chữ khi bấm công cụ/thuộc tính.
 2. **Tên file**: thêm `#fileTitle`; cập nhật trong `loadPdf`/`save` bằng `basename(origPath)` (chỉ trình bày).
 3. **Toggle panel**: 2 handler nhỏ cho nút thu gọn thumbnails/inspector (thêm/xoá class trên `<body>` hoặc `#chrome`); không đụng logic đối tượng/export/session.
-4. `aria-label`/`title` cho icon-only; không đổi phím tắt hay handler hiện có.
+4. **Giữ class body khi đổi công cụ**: `setTool()` hiện gán `document.body.className = 'tool-' + t`, làm mất `dirty`, `thumbs-collapsed`, `thumbs-open`, `inspector-open`. Đổi sang giữ các class không bắt đầu bằng `tool-` rồi thêm class mới — cần cho trạng thái UI M3.
+5. `aria-label`/`title` cho icon-only; không đổi phím tắt hay handler hiện có.
 
 Không thay đổi: `app.js` object model, export PDF, font subset, signature, session, undo/redo, zoom math, render PDF.js.
 

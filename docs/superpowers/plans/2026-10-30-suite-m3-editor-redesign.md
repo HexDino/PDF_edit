@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Giữ nguyên **mọi** ID/class/selector liệt kê ở spec §2; không sửa selector trong 8 bộ test cũ.
-- Chỉ sửa `app.js` đúng 3 nhóm hook ở spec §7; không đổi object model, render PDF.js, export, font subset, chữ ký, phiên, undo/redo, zoom math, phím tắt.
+- Chỉ sửa `app.js` đúng 3 nhóm hook + việc giữ class body trong `setTool()` ở spec §7; không đổi object model, render PDF.js, export, font subset, chữ ký, phiên, undo/redo, zoom math, phím tắt.
 - Không thêm dependency; offline; tiếng Việt; cửa sổ tối thiểu 900×600; chữ ≥12 px; vùng bấm ≥32 px.
 - Giữ `<header>` (app.js), `#wrap`, `#side`, `#thumbs`, `#viewer`, `#pages`, `#empty`, `.ctx .sec[data-ctx]`, body class `tool-*`.
 - Sau **mỗi** task: `npm test`, `npm run test:e2e`, `test:overlay`, `test:signature`, `test:erase`, `test:editing`, `test:session`, `test:rotation`, `test:fonts` phải xanh. Task chạm phần dùng chung còn phải chạy `test:tools` + `test:suite`.
@@ -269,11 +269,41 @@ git commit -m "M3: khung editor canvas-first và hợp đồng DOM"
 **Files:**
 - Modify: `app/renderer/editor.html` (top bar/rail)
 - Modify: `app/renderer/styles.css` (top bar/rail/menu)
+- Modify: `app/renderer/app.js` (`setTool()` giữ body class)
 - Test: chạy `test/e2e.mjs`, `test/editing.mjs`, `test/session.mjs`
 
 **Interfaces:**
 - Consumes: `#fileTitle`, body `dirty` từ Task 1.
-- Produces: menu `<details class="menu">` với `#saveSessionBtn`/`#clearSessionBtn`; rail `[data-tool]` + `#sigBtn`/`#imgBtn`.
+- Produces: menu `<details class="menu">` với `#saveSessionBtn`/`#clearSessionBtn`; rail `[data-tool]` + `#sigBtn`/`#imgBtn`; body class `dirty`/drawer sống sót khi đổi công cụ.
+
+- [ ] **Step 0: Giữ body class khi đổi công cụ + test**
+
+Sửa `setTool()` trong `app.js`:
+
+```js
+function setTool(t) {
+  if (t !== 'pick') prevTool = t;
+  tool = t;
+  const keep = [...document.body.classList].filter(c => !c.startsWith('tool-'));
+  document.body.className = [...keep, 'tool-' + t].join(' ');
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  if (t !== 'place') pendingPlace = null;
+  syncControls();
+}
+```
+
+Thêm test vào `test/editing.mjs` (trước phần tổng kết):
+
+```js
+await A(() => document.body.classList.add('dirty', 'inspector-open'));
+await w.click('[data-tool="pen"]');
+const kept = await A(() => ({ cls: document.body.className, dirty: document.body.classList.contains('dirty'), drawer: document.body.classList.contains('inspector-open') }));
+if (!kept.dirty || !kept.drawer || !/\btool-pen\b/.test(kept.cls)) throw new Error('setTool làm mất class body: ' + kept.cls);
+await A(() => document.body.classList.remove('dirty', 'inspector-open'));
+console.log('setTool giữ body class ok:', kept.cls);
+```
+
+Run: `cd app && node test/editing.mjs` → đỏ trước khi sửa (`setTool làm mất class body`), xanh sau khi sửa.
 
 - [ ] **Step 1: Viết kiểm tra UI (đỏ nếu thiếu hành vi)**
 
