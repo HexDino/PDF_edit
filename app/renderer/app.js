@@ -313,7 +313,10 @@ $('viewer').addEventListener('scroll', () => {
 const CTX_OF = { text: 'text', rect: 'rect', brush: 'rect', lasso: 'rect', img: 'img', ink: null };
 function setTool(t) {
   if (t !== 'pick') prevTool = t;
-  tool = t; document.body.className = 'tool-' + t;
+  tool = t;
+  // Chỉ thay class tool-*; giữ các class trạng thái UI (dirty, drawer, thumbnails...).
+  const keep = [...document.body.classList].filter(c => !c.startsWith('tool-'));
+  document.body.className = [...keep, 'tool-' + t].join(' ');
   document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
   if (t !== 'place') pendingPlace = null;
   syncControls();
@@ -1566,6 +1569,8 @@ function sessionTag(state, when) {
 }
 $('saveSessionBtn').onclick = () => saveSession(false);
 $('clearSessionBtn').onclick = () => clearSession();
+// Menu Tệp là <details> CSS-only: đóng lại ngay khi chọn một mục.
+document.querySelectorAll('.menu .pop button').forEach(b => b.addEventListener('click', () => b.closest('details').removeAttribute('open')));
 
 /* ======================= Phím tắt ======================= */
 const homeBtn = document.getElementById('homeBtn');

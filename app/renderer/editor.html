@@ -9,51 +9,75 @@
 <script src="vendor/fontkit.umd.min.js"></script>
 </head>
 <body class="tool-text">
+<svg class="iconSprite" aria-hidden="true" focusable="false">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-2"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h10l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><path d="M7 21v-7h10v7"/></symbol>
+  <symbol id="i-save-as" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"/><path d="M14 3l5 5v3"/><path d="M14 3v5h5"/><path d="M18 14v7m0 0 3-3m-3 3-3-3"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17l-6-4-6 4z"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/></symbol>
+  <symbol id="i-panel-left" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+  <symbol id="i-panel-right" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+  <symbol id="i-select" viewBox="0 0 24 24"><path d="M5 3l14 7-6.3 1.9L11 18z"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4-4a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 2.8 0l4 4a2 2 0 0 1 0 2.8L12 19"/><path d="M22 21H7"/><path d="m5 11 8 8"/></symbol>
+  <symbol id="i-sign" viewBox="0 0 24 24"><path d="M3 16c2.2-4.8 3.7-7 5.4-5.1s1.7 7.3 3.7 7.3 2.4-7.1 4.4-7.1 1.8 3.4 4.5 3.4"/><path d="M4 20h16"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5-8 8"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M21.2 6.8a2 2 0 0 0-2.8-2.8L3.8 18.6a2 2 0 0 0-.5.8l-1.3 4.4 4.4-1.3a2 2 0 0 0 .8-.5z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="i-highlight" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></symbol>
+</svg>
 <div id="chrome">
   <header class="topbar">
-    <button id="homeBtn" class="iconBtn" title="Về trang chủ" aria-label="Về trang chủ">←</button>
+    <button id="homeBtn" class="iconBtn" title="Về trang chủ" aria-label="Về trang chủ"><svg class="i"><use href="#i-back"/></svg></button>
     <div class="fileMeta">
       <span id="fileTitle" class="fileName">Chưa mở file</span>
       <span class="fileSub"><span class="dot ok" id="dot"></span><span id="status">Sẵn sàng</span><span id="sessionTag" hidden></span></span>
     </div>
     <div class="grow"></div>
     <div class="grp">
-      <button id="openBtn" class="btn" title="Mở file PDF (Ctrl+O)">📂 <span class="lbl">Mở</span></button>
-      <button id="undoBtn" class="iconBtn" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác">↶</button>
-      <button id="redoBtn" class="iconBtn" title="Làm lại (Ctrl+Y)" aria-label="Làm lại">↷</button>
-      <button id="delBtn" class="iconBtn" title="Xoá đối tượng đang chọn (Delete)" aria-label="Xoá đối tượng" disabled>🗑</button>
+      <button id="openBtn" class="btn" title="Mở file PDF (Ctrl+O)" aria-label="Mở file PDF (Ctrl+O)"><svg class="i"><use href="#i-folder"/></svg><span class="lbl">Mở</span></button>
+      <button id="undoBtn" class="iconBtn" title="Hoàn tác (Ctrl+Z)" aria-label="Hoàn tác"><svg class="i"><use href="#i-undo"/></svg></button>
+      <button id="redoBtn" class="iconBtn" title="Làm lại (Ctrl+Y)" aria-label="Làm lại"><svg class="i"><use href="#i-redo"/></svg></button>
+      <button id="delBtn" class="iconBtn" title="Xoá đối tượng đang chọn (Delete)" aria-label="Xoá đối tượng" disabled><svg class="i"><use href="#i-trash"/></svg></button>
     </div>
     <div class="grp">
-      <button id="saveBtn" class="btn primary" title="Lưu (Ctrl+S)" disabled>💾 <span class="lbl">Lưu</span></button>
-      <button id="saveAsBtn" class="btn" title="Lưu thành file khác (Ctrl+Shift+S)" disabled><span class="lbl">Lưu thành…</span></button>
+      <button id="saveBtn" class="btn primary" title="Lưu (Ctrl+S)" aria-label="Lưu (Ctrl+S)" disabled><svg class="i"><use href="#i-save"/></svg><span class="lbl">Lưu</span></button>
+      <button id="saveAsBtn" class="btn" title="Lưu thành file khác (Ctrl+Shift+S)" aria-label="Lưu thành file khác (Ctrl+Shift+S)" disabled><svg class="i"><use href="#i-save-as"/></svg><span class="lbl">Lưu thành…</span></button>
       <details class="menu">
-        <summary class="btn ghost"><span class="lbl">Tệp</span> ▾</summary>
+        <summary class="btn ghost" title="Tệp" aria-label="Tệp"><svg class="i"><use href="#i-file"/></svg><span class="lbl">Tệp</span><svg class="i sm chev"><use href="#i-chev"/></svg></summary>
         <div class="pop">
-          <button id="saveSessionBtn" disabled>🗂 Lưu phiên</button>
-          <button id="clearSessionBtn" disabled>Xoá phiên</button>
+          <button id="saveSessionBtn" disabled><svg class="i"><use href="#i-bookmark"/></svg>Lưu phiên</button>
+          <button id="clearSessionBtn" disabled><svg class="i"><use href="#i-trash"/></svg>Xoá phiên</button>
         </div>
       </details>
     </div>
     <div class="grp zoom">
-      <button id="zoomOut" class="iconBtn" title="Thu nhỏ (Ctrl −)">−</button>
+      <button id="zoomOut" class="iconBtn" title="Thu nhỏ (Ctrl −)" aria-label="Thu nhỏ"><svg class="i"><use href="#i-minus"/></svg></button>
       <span id="zoomLbl">100%</span>
-      <button id="zoomIn" class="iconBtn" title="Phóng to (Ctrl +)">+</button>
-      <button id="zoomFit" class="iconBtn" title="Vừa chiều rộng">↔</button>
+      <button id="zoomIn" class="iconBtn" title="Phóng to (Ctrl +)" aria-label="Phóng to"><svg class="i"><use href="#i-plus"/></svg></button>
+      <button id="zoomFit" class="iconBtn" title="Vừa chiều rộng" aria-label="Vừa chiều rộng"><svg class="i"><use href="#i-fit"/></svg></button>
     </div>
-    <button id="inspectorToggle" class="iconBtn" title="Thuộc tính" aria-label="Mở thuộc tính">☰</button>
+    <button id="inspectorToggle" class="iconBtn" title="Thuộc tính" aria-label="Mở thuộc tính"><svg class="i"><use href="#i-panel-right"/></svg></button>
   </header>
 
   <div id="wrap">
     <nav id="rail" aria-label="Công cụ">
-      <button class="tool" data-tool="select" title="Chọn / di chuyển (V)">↖<span>Chọn</span></button>
-      <button class="tool on" data-tool="text" title="Thêm chữ viết tay (T)">✎<span>Chữ</span></button>
-      <button class="tool" data-tool="erase" title="Tẩy xóa (E)">▭<span>Tẩy xoá</span></button>
-      <button class="tool" id="sigBtn" title="Chữ ký">✍<span>Chữ ký</span></button>
-      <button class="tool" id="imgBtn" title="Chèn ảnh">🖼<span>Ảnh</span></button>
-      <button class="tool" data-tool="pen" title="Bút vẽ (P)">🖊<span>Bút</span></button>
-      <button class="tool" data-tool="hl" title="Bút dạ quang (H)">🖍<span>Dạ quang</span></button>
+      <button class="tool" data-tool="select" title="Chọn / di chuyển (V)" aria-label="Chọn / di chuyển (V)"><svg class="i"><use href="#i-select"/></svg><span>Chọn</span></button>
+      <button class="tool on" data-tool="text" title="Thêm chữ viết tay (T)" aria-label="Thêm chữ viết tay (T)"><svg class="i"><use href="#i-text"/></svg><span>Chữ</span></button>
+      <button class="tool" data-tool="erase" title="Tẩy xoá (E)" aria-label="Tẩy xoá (E)"><svg class="i"><use href="#i-eraser"/></svg><span>Tẩy xoá</span></button>
+      <button class="tool" id="sigBtn" title="Chữ ký" aria-label="Chữ ký"><svg class="i"><use href="#i-sign"/></svg><span>Chữ ký</span></button>
+      <button class="tool" id="imgBtn" title="Chèn ảnh" aria-label="Chèn ảnh"><svg class="i"><use href="#i-image"/></svg><span>Ảnh</span></button>
+      <button class="tool" data-tool="pen" title="Bút vẽ (P)" aria-label="Bút vẽ (P)"><svg class="i"><use href="#i-pen"/></svg><span>Bút</span></button>
+      <button class="tool" data-tool="hl" title="Bút dạ quang (H)" aria-label="Bút dạ quang (H)"><svg class="i"><use href="#i-highlight"/></svg><span>Dạ quang</span></button>
       <span class="grow"></span>
-      <button id="thumbsToggle" class="iconBtn" title="Ẩn/hiện trang" aria-label="Ẩn/hiện trang">▤</button>
+      <button id="thumbsToggle" class="iconBtn railBtn" title="Ẩn/hiện trang" aria-label="Ẩn/hiện trang"><svg class="i"><use href="#i-panel-left"/></svg></button>
     </nav>
 
     <aside id="side">

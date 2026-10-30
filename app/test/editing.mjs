@@ -131,6 +131,34 @@ const midAnchor = await A(async (url) => {
 }, sigUrl);
 check('Góc dưới trái cách mép 28 điểm', Math.abs(midAnchor.left - 28) < 0.01, `x=${midAnchor.left.toFixed(1)}`);
 
+/* ---------- 4. Đổi công cụ phải giữ class body (dirty, drawer, ...) ---------- */
+await A(() => document.body.classList.add('dirty', 'inspector-open'));
+await w.click('[data-tool="pen"]');
+const kept = await A(() => ({ cls: document.body.className, dirty: document.body.classList.contains('dirty'), drawer: document.body.classList.contains('inspector-open') }));
+if (!kept.dirty || !kept.drawer || !/\btool-pen\b/.test(kept.cls)) throw new Error('setTool làm mất class body: ' + kept.cls);
+await A(() => document.body.classList.remove('dirty', 'inspector-open'));
+console.log('setTool giữ body class ok:', kept.cls);
+
+/* ---------- 5. Hợp đồng UI top bar/rail ---------- */
+const ui = await A(() => ({
+  railTools: [...document.querySelectorAll('#rail [data-tool]')].map(b => b.dataset.tool),
+  saveInMenu: !!document.querySelector('.menu #saveSessionBtn'),
+  title: document.getElementById('fileTitle').textContent,
+  dirtyClass: document.body.classList.contains('dirty'),
+}));
+if (ui.railTools.join(',') !== 'select,text,erase,pen,hl') throw new Error('Rail tools sai: ' + ui.railTools);
+if (!ui.saveInMenu) throw new Error('Thiếu Lưu phiên trong menu Tệp');
+if (!ui.title) throw new Error('Thiếu tên file ở top bar');
+console.log('top bar/rail ok:', JSON.stringify(ui));
+
+// Menu Tệp phải đóng ngay khi chọn một mục (huỷ hộp xác nhận để không xoá phiên thật).
+await A(() => { window.__confirm = window.confirm; window.confirm = () => false; document.querySelector('.menu').open = true; });
+await w.click('#clearSessionBtn');
+const menuClosed = await A(() => !document.querySelector('.menu').open);
+await A(() => { window.confirm = window.__confirm; });
+if (!menuClosed) throw new Error('Menu Tệp không đóng sau khi chọn mục');
+console.log('menu Tệp đóng sau khi chọn mục ok');
+
 check('Không có lỗi JS trong suốt quá trình', errors.length === 0, errors.slice(0, 2).join(' | '));
 
 await w.screenshot({ path: path.join(OUT, 'editing-ui.png') }).catch(() => {});
