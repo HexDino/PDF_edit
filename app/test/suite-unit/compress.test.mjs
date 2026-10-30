@@ -227,7 +227,7 @@ test('raster nhân kích thước trang theo /UserUnit', async t => {
   const file = path.join(dir, 'unit.pdf');
   const src = await PDFDocument.create();
   const page = src.addPage([200, 300]);
-  page.node.set(PDFName.of('UserUnit'), PDFNumber.of(2));
+  page.node.set(PDFName.of('UserUnit'), src.context.register(PDFNumber.of(2)));
   page.drawText('Trang 1', { x: 20, y: 250, size: 14 });
   fs.writeFileSync(file, await src.save());
 

@@ -59,7 +59,7 @@ async function loadPdf(file) {
 
 // PDF.js nhân kích thước viewport với /UserUnit; giá trị thiếu = 1, <= 0 là file hỏng.
 function userUnit(page) {
-  const value = page.node.get(PDFName.of('UserUnit'));
+  const value = page.node.lookup(PDFName.of('UserUnit'));
   if (value === undefined) return 1;
   const unit = value && typeof value.asNumber === 'function' ? value.asNumber() : NaN;
   if (!Number.isFinite(unit) || unit <= 0) {
