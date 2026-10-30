@@ -304,3 +304,19 @@ test('qpdf không tạo file → INTERNAL, không lộ đường dẫn', async t
   );
   assert.equal(fs.existsSync(path.join(dir, 'a-nen.pdf')), false);
 });
+
+test('thiếu qpdf → BINARY_MISSING, không tạo output', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'a.pdf');
+  await makePdf(file, 2);
+  const ctx = ctxFor(file, dir);
+  ctx.qpdf = async () => {
+    throw Object.assign(new Error('spawn qpdf ENOENT'), { code: 'ENOENT' });
+  };
+
+  await assert.rejects(
+    compressTool(ctx),
+    e => e.code === 'BINARY_MISSING' && !e.message.includes(dir),
+  );
+  assert.equal(fs.existsSync(path.join(dir, 'a-nen.pdf')), false);
+});

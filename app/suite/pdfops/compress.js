@@ -110,6 +110,10 @@ async function compressLossless(ctx, file) {
       discard(tmp);
       throw e;
     }
+    if (e.code === 'ENOENT') {
+      discard(tmp);
+      throw new ToolError('BINARY_MISSING', 'Thiếu qpdf để nén PDF. Chạy npm run fetch:qpdf rồi thử lại.');
+    }
     // qpdf exit code 3 = chỉ có cảnh báo; file tạm vẫn dùng được.
     if (!(e.exitCode === 3 && hasUsableOutput(tmp))) {
       discard(tmp);
