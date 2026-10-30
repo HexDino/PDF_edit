@@ -1,7 +1,7 @@
 {
   "name": "trinh-sua-pdf",
   "productName": "Trình sửa PDF",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Bộ công cụ PDF offline cho Windows: 13 công cụ (ghép, tách, tổ chức, crop, số trang, watermark, chuyển đổi, bảo mật) và trình sửa PDF.",
   "author": "Nguyễn Thanh Hưng",
   "main": "main.js",

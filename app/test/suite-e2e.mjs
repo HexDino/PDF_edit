@@ -461,7 +461,8 @@ try {
   const cancelOut = path.join(OUT, 'm1b-cancel-out');
   fs.rmSync(cancelOut, { recursive: true, force: true });
   fs.mkdirSync(cancelOut, { recursive: true });
-  await makeSized(cancelSrc, Array.from({ length: 16 }, () => [600, 800]));
+  // 80 trang để job chắc chắn còn chạy khi bấm Huỷ (16 trang có thể xong trước cú click).
+  await makeSized(cancelSrc, Array.from({ length: 80 }, () => [600, 800]));
   await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: cancelSrc, out: cancelOut });
   await w.evaluate(({ file, out }) => {
     window.__suite.addFiles([file]);

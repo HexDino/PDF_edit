@@ -6,8 +6,19 @@ Mọi thao tác chạy trên máy: không upload file, không telemetry. Mạng 
 
 ![Trang chủ bộ công cụ](docs/screenshot-suite-home.png)
 
+## Tải bản dựng sẵn
+
+Tải ở trang [GitHub Releases](https://github.com/HexDino/PDF_edit/releases/latest):
+
+- **`TrinhSuaPDF-1.2.0-portable.exe`** — chạy ngay, không cần cài đặt.
+- **`TrinhSuaPDF-1.2.0-Setup.exe`** — bộ cài NSIS, tạo lối tắt và liên kết file PDF.
+- **`SHA256SUMS.txt`** — mã kiểm tra toàn vẹn của các file tải về.
+
+Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows SmartScreen có thể cảnh báo lần đầu — chọn *More info → Run anyway* sau khi đã kiểm tra SHA-256.
+
 ## Mục lục
 
+- [Tải bản dựng sẵn](#tải-bản-dựng-sẵn)
 - [Tính năng](#tính-năng)
 - [Ảnh giao diện](#ảnh-giao-diện)
 - [Cài đặt và chạy](#cài-đặt-và-chạy)
@@ -105,8 +116,8 @@ npm run build        # prebuild tự chạy fetch:qpdf
 
 Kết quả trong `app/dist/`:
 
-- `TrinhSuaPDF-1.1.0-portable.exe` — chạy ngay, không cần cài.
-- `TrinhSuaPDF-1.1.0-Setup.exe` — bộ cài NSIS.
+- `TrinhSuaPDF-1.2.0-portable.exe` — chạy ngay, không cần cài.
+- `TrinhSuaPDF-1.2.0-Setup.exe` — bộ cài NSIS.
 
 Ghi chú:
 
