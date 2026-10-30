@@ -202,7 +202,8 @@ body.dirty .fileSub .dot{background:#f59e0b}
 #viewer{flex:1;overflow:auto;position:relative}
 #inspector{width:var(--inspector);background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;flex:none;z-index:10}
 .inspHead{height:52px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line)}
-.ctx{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:12px;background:#fff}
+/* Task 1: chưa đặt overflow để #fontPanel tuyệt đối không bị cắt; Task 3 sẽ chuyển panel sang fixed rồi mới cho scroll. */
+.ctx{flex:1;overflow:visible;display:flex;flex-direction:column;gap:10px;padding:12px;background:#fff}
 .ctx .sec{display:none;flex-direction:column;gap:8px;padding:12px;border:1px solid #e8edf4;border-radius:10px}
 .ctx .sec.show{display:flex}
 .hintBar{height:var(--hint);background:#fbfcfe;border-top:1px solid #eef1f5;display:flex;align-items:center;padding:0 14px;font-size:11.5px;color:var(--mut)}
@@ -358,9 +359,11 @@ Expected: FAIL `Inspector không hiện nhóm tẩy xoá` hoặc `Inspector quá
 .ctx .sec .lbl{font-size:12px}
 .ctx .sec .warn{max-width:none}
 #fontBtn{min-width:0;width:100%;justify-content:space-between;font-size:17px;height:46px}
-#fontPanel{left:auto;right:calc(100% + 10px);top:0;width:380px;max-height:70vh}
+/* fixed để không bị .ctx (scroll) cắt; đặt ngay bên trái inspector */
+#fontPanel{position:fixed;left:auto;right:calc(var(--inspector) + 16px);top:108px;width:380px;max-height:70vh;z-index:60}
+.ctx{overflow-y:auto}
 @media (max-width:1199px){
-  #fontPanel{position:fixed;left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:min(520px,92vw);z-index:90}
+  #fontPanel{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:min(520px,92vw);z-index:90}
 }
 ```
 
