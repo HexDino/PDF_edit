@@ -14,6 +14,11 @@ const state = {
 const pendingJobEvents = [];
 
 const baseName = p => String(p).split(/[\\/]/).pop();
+const formatBytes = n => {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+};
 const toast = (msg, ms = 3000) => {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
@@ -240,6 +245,7 @@ function updateRun() {
 // Cảnh báo không làm hỏng job: chỉ hiện câu ngắn, không lộ đường dẫn/mã lỗi.
 const RESULT_WARNINGS = {
   NETWORK_BLOCKED: 'Một số ảnh hoặc định dạng từ mạng đã bị chặn; PDF có thể thiếu nội dung.',
+  TEXT_LAYER_REMOVED: 'Các trang đã raster hoá không còn lớp chữ.',
 };
 function resultWarning(errors) {
   if (!Array.isArray(errors) || !errors.length) return '';
@@ -258,7 +264,7 @@ function renderResult() {
     return;
   }
   const r = state.lastResult;
-  box.innerHTML = '<div class="ok"></div><div class="warn" hidden></div><ul></ul><div class="row"></div>';
+  box.innerHTML = '<div class="ok"></div><div class="warn" hidden></div><ul></ul><div class="stats" hidden></div><div class="row"></div>';
   box.querySelector('.ok').textContent = `Xong · ${r.outputs.length} file`;
   const warning = resultWarning(r.errors);
   if (warning) {
@@ -271,6 +277,15 @@ function renderResult() {
     const li = document.createElement('li');
     li.textContent = `${baseName(o.path)} · ${Math.max(1, Math.round((o.bytes || 0) / 1024))} KB`;
     box.querySelector('ul').appendChild(li);
+  }
+  // Chỉ hiện số đo thực tế của công cụ có beforeBytes (hiện tại là Nén PDF);
+  // lossless có thể làm file tăng nên nhãn phải phản ánh đúng chiều thay đổi.
+  if (typeof r.stats?.beforeBytes === 'number' && typeof r.stats?.afterBytes === 'number') {
+    const percent = Number.isFinite(r.stats.savedPercent) ? Math.round(r.stats.savedPercent) : 0;
+    const chip = box.querySelector('.stats');
+    const verb = percent < 0 ? 'Tăng' : 'Giảm';
+    chip.textContent = `Dung lượng: ${formatBytes(r.stats.beforeBytes)} → ${formatBytes(r.stats.afterBytes)} · ${verb} ${Math.abs(percent)}%`;
+    chip.hidden = false;
   }
   const open = document.createElement('button'); open.className = 'btn'; open.textContent = 'Mở thư mục';
   open.onclick = () => S?.reveal(r.outputs[0]?.path);

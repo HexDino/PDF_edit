@@ -17,16 +17,39 @@ test('mỗi công cụ có trường bắt buộc', () => {
     }
   }
 });
-test('13 công cụ khả dụng, 1 công cụ đang chờ', () => {
+test('14 công cụ khả dụng, 0 công cụ đang chờ', () => {
   const tools = listTools();
   for (const id of [
     'merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'watermark',
-    'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata',
+    'pdf-images', 'images-pdf', 'html-pdf', 'compress', 'protect', 'unlock', 'metadata',
   ]) {
     assert.equal(tools.find(t => t.id === id).status, 'available');
   }
-  assert.equal(tools.filter(t => t.status === 'available').length, 13);
-  assert.equal(tools.filter(t => t.status === 'planned').length, 1);
+  assert.equal(tools.filter(t => t.status === 'available').length, 14);
+  assert.equal(tools.filter(t => t.status === 'planned').length, 0);
+});
+test('compress khả dụng với lossless mặc định và các tuỳ chọn raster', () => {
+  const tool = listTools().find(t => t.id === 'compress');
+  assert.equal(tool.status, 'available');
+  assert.equal(tool.group, 'optimize');
+  assert.equal(tool.multiple, false);
+  assert.deepEqual(tool.accept, ['.pdf']);
+  const option = key => tool.options.find(o => o.key === key);
+  assert.equal(option('mode').type, 'enum');
+  assert.deepEqual(option('mode').values, ['lossless', 'raster']);
+  assert.equal(option('mode').default, 'lossless');
+  assert.match(option('mode').labels.raster, /mất lớp chữ/);
+  assert.equal(option('pages').type, 'range');
+  assert.equal(option('pages').default, '');
+  assert.equal(option('dpi').type, 'int');
+  assert.deepEqual([option('dpi').min, option('dpi').max], [72, 600]);
+  assert.equal(option('dpi').default, 150);
+  assert.equal(option('format').type, 'enum');
+  assert.deepEqual(option('format').values, ['jpg', 'png']);
+  assert.equal(option('format').default, 'jpg');
+  assert.equal(option('quality').type, 'int');
+  assert.deepEqual([option('quality').min, option('quality').max], [60, 100]);
+  assert.equal(option('quality').default, 80);
 });
 test('watermark khả dụng với chữ hoặc ảnh và các tuỳ chọn đã duyệt', () => {
   const tool = listTools().find(t => t.id === 'watermark');

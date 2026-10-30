@@ -1,6 +1,6 @@
 # Trình sửa PDF (TrinhSuaPDF)
 
-Bộ công cụ PDF **ngoại tuyến** cho Windows x64, giao diện tiếng Việt: 13 công cụ xử lý PDF (ghép, tách, tổ chức trang, crop, số trang/header-footer, watermark, chuyển đổi, khoá/mở khoá, xoá metadata) cùng **trình sửa PDF** đầy đủ (chữ viết tay, tẩy/xoá, chữ ký, phiên chỉnh sửa).
+Bộ công cụ PDF **ngoại tuyến** cho Windows x64, giao diện tiếng Việt: 14 công cụ xử lý PDF (ghép, tách, tổ chức trang, crop, số trang/header-footer, watermark, chuyển đổi, nén, khoá/mở khoá, xoá metadata) cùng **trình sửa PDF** đầy đủ (chữ viết tay, tẩy/xoá, chữ ký, phiên chỉnh sửa).
 
 Mọi thao tác chạy trên máy: không upload file, không telemetry. Mạng chỉ cần cho `npm install` và tải qpdf ở lần build đầu.
 
@@ -33,7 +33,7 @@ Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows Smart
 
 ## Tính năng
 
-### Bộ công cụ PDF (13 công cụ đang bật)
+### Bộ công cụ PDF (14 công cụ đang bật)
 
 | Nhóm | Công cụ | Việc làm | Đầu ra |
 |---|---|---|---|
@@ -47,11 +47,12 @@ Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows Smart
 | Chuyển đổi | **PDF → ảnh** | JPG/PNG, DPI 72–600, chọn trang; cạnh dài tối đa 10.000 px | thư mục `<tên>-anh/` |
 | Chuyển đổi | **Ảnh → PDF** | JPG/PNG/WebP theo thứ tự, khổ A4/A3/Letter/tự động, lề mm | `<ảnh-đầu>-anh.pdf` |
 | Chuyển đổi | **HTML → PDF** | In file HTML local, khổ/hướng/lề/nền; chặn tài nguyên mạng | `<tên>-html.pdf` |
+| Tối ưu | **Nén PDF** | Lossless bằng qpdf hoặc raster hoá trang chọn (DPI, PNG/JPEG, chất lượng); hiện dung lượng trước/sau | `<tên>-nen.pdf` |
 | Bảo mật | **Khoá PDF** | AES-256, mật khẩu mở/chủ, hạn chế in/sao chép/sửa | `<tên>-khoa.pdf` |
 | Bảo mật | **Mở khoá PDF** | Gỡ mã hoá khi biết mật khẩu | `<tên>-mo-khoa.pdf` |
 | Bảo mật | **Xoá metadata** | Xoá Info, XMP (catalog + trang), tệp đính kèm | `<tên>-xoa-metadata.pdf` |
 
-**Nén PDF** đang ở trạng thái “Sắp có” — không giả vờ đã có.
+**Nén PDF**: chế độ lossless (qpdf) chỉ nén lại cấu trúc/luồng dữ liệu nên **không hứa giảm nhiều** — có file còn tăng dung lượng; kết quả hiển thị đúng số đo trước/sau. Chế độ raster chỉ thay các trang đã chọn bằng ảnh và **làm mất lớp chữ trên các trang đó**; các trang không chọn được giữ nguyên.
 
 Điểm chung của bộ công cụ:
 
@@ -103,7 +104,7 @@ npm run fetch:qpdf   # tải qpdf 12.4.2 (mingw64) + kiểm SHA-256 vào bin/win
 npm start            # mở trang chủ bộ công cụ
 ```
 
-- Công cụ cần qpdf: Ghép, Khoá, Mở khoá. Thiếu qpdf thì các công cụ khác vẫn chạy, nhưng nên chạy `fetch:qpdf` một lần.
+- Công cụ cần qpdf: Ghép, Khoá, Mở khoá, Nén (lossless). Thiếu qpdf thì các công cụ khác vẫn chạy, nhưng nên chạy `fetch:qpdf` một lần.
 - Mở trình sửa: nút **Chỉnh sửa PDF** ở trang chủ, hoặc mở file `.pdf` bằng app.
 - Dữ liệu cục bộ: log tại `%APPDATA%\TrinhSuaPDF\logs\tools.log`; thư mục job tạm tại `%TEMP%\TrinhSuaPDF\jobs`.
 - Thư viện chữ ký: `%APPDATA%\TrinhSuaPDF\signatures`.
@@ -207,7 +208,7 @@ publishUnique → file kết quả (không ghi đè)
 
 ## Định dạng đầu ra
 
-Hậu tố theo công cụ: `-ghep`, `-tach/`, `-xoa-trang`, `-trich-trang`, `-to-chuc`, `-crop`, `-so-trang`, `-watermark`, `-anh/`, `-anh.pdf`, `-html`, `-khoa`, `-mo-khoa`, `-xoa-metadata`.
+Hậu tố theo công cụ: `-ghep`, `-tach/`, `-xoa-trang`, `-trich-trang`, `-to-chuc`, `-crop`, `-so-trang`, `-watermark`, `-anh/`, `-anh.pdf`, `-html`, `-nen`, `-khoa`, `-mo-khoa`, `-xoa-metadata`.
 
 - Mặc định ghi cùng thư mục file nguồn; đổi được bằng nút **Chọn thư mục xuất**.
 - Trùng tên → thêm ` (2)`, ` (3)`…; không có tuỳ chọn ghi đè.
@@ -225,7 +226,7 @@ Hậu tố theo công cụ: `-ghep`, `-tach/`, `-xoa-trang`, `-trich-trang`, `-t
 
 **Giới hạn**
 
-- **Nén PDF** chưa có (trạng thái “Sắp có”).
+- **Nén PDF** lossless có thể không giảm, thậm chí tăng dung lượng (chỉ nén lại cấu trúc); raster làm mất lớp chữ trên đúng các trang đã chọn và ảnh 600 DPI có thể rất nặng.
 - Chưa có cảnh báo tự động “chữ ký số sẽ mất hiệu lực” khi sửa PDF đã ký — cần bổ sung cho toàn bộ công cụ.
 - HTML → PDF vẫn cho phép tài nguyên `file:`/UNC cùng máy; WebRTC/STUN, DNS prefetch/preconnect không bị `webRequest` chặn. Không dùng công cụ này để mở HTML không tin cậy.
 - Xoá metadata: xử lý Info, XMP catalog/trang, tệp đính kèm trong `/Names` và `/AF` catalog, dọn object không truy cập được từ trailer; **không** quét mọi vị trí metadata cấp trang/annotation, XFA, trailer ID — không nên coi là ẩn danh tuyệt đối.

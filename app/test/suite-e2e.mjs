@@ -63,15 +63,15 @@ try {
 
   // 1. Trang chủ render đủ 14 thẻ, đúng trạng thái.
   assert.equal(await w.locator('#toolGrid .card').count(), 14);
-  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 13);
-  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 1);
-  assert.equal(await w.locator('#toolGrid .card .st').count(), 1);
+  assert.equal(await w.locator('#toolGrid .card:not([disabled])').count(), 14);
+  assert.equal(await w.locator('#toolGrid .card[disabled]').count(), 0);
+  assert.equal(await w.locator('#toolGrid .card .st').count(), 0);
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
   assert.deepEqual(
     await w.$$eval('#toolGrid .card:not([disabled])', els => els.map(el => el.dataset.toolId)),
-    ['merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'watermark', 'pdf-images', 'images-pdf', 'html-pdf', 'protect', 'unlock', 'metadata'],
+    ['merge', 'split', 'pages', 'organize', 'crop', 'stamp', 'watermark', 'pdf-images', 'images-pdf', 'html-pdf', 'compress', 'protect', 'unlock', 'metadata'],
   );
-  console.log('home: 14 thẻ · 13 bật (merge, split, pages, organize, crop, stamp, watermark, pdf-images, images-pdf, html-pdf, protect, unlock, metadata) · 1 tắt · 1 nhãn “Sắp có” · 5 nhóm');
+  console.log('home: 14 thẻ · 14 bật (merge, split, pages, organize, crop, stamp, watermark, pdf-images, images-pdf, html-pdf, compress, protect, unlock, metadata) · 0 tắt · 0 nhãn “Sắp có” · 5 nhóm');
 
   // 2. Tìm kiếm theo title + description.
   await w.fill('#toolSearch', 'ghép');
@@ -175,19 +175,20 @@ try {
   assert.equal(await w.locator('#nav .navItem.on').textContent(), 'Trang chủ');
   assert.equal(await w.locator('#toolGrid .groupTitle').count(), 5);
 
-  // 8. Hash công cụ “Sắp có”/không tồn tại được xoá sạch, không kẹt tool view.
+  // 8. Hash công cụ đã mở được tool view; hash lạ được xoá sạch, không kẹt tool view.
   await w.evaluate(() => { location.hash = '#/tool/compress'; });
   await w.waitForFunction(
-    () => location.hash === '' && document.getElementById('toast').textContent.includes('đợt sau'),
+    () => location.hash === '#/tool/compress' && !document.getElementById('toolView').hidden,
   );
-  assert.equal(await w.locator('#toolView').isVisible(), false);
-  assert.equal(await w.evaluate(() => window.__suite.state.tool), null);
-  console.log('hash tool “Sắp có”: về home, xoá hash');
+  assert.equal(await w.locator('#toolTitle').textContent(), 'Nén PDF');
+  assert.equal(await w.evaluate(() => window.__suite.state.tool?.id), 'compress');
+  console.log('hash tool compress: mở tool view “Nén PDF”');
 
   await w.evaluate(() => { location.hash = '#/tool/khong-ton-tai'; });
   await w.waitForFunction(() => location.hash === '');
   assert.equal(await w.locator('#homeView').isVisible(), true);
   assert.equal(await w.locator('#toolView').isVisible(), false);
+  assert.equal(await w.evaluate(() => window.__suite.state.tool), null);
   console.log('hash không tồn tại: về home, xoá hash');
 
   // 9. Editor vẫn mở như trước.
@@ -203,7 +204,7 @@ try {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
   const {
-    PDFDocument, PDFName, PDFString,
+    PDFDocument, PDFName, PDFString, StandardFonts,
   } = require('pdf-lib');
   async function make(file, n) {
     const d = await PDFDocument.create();
@@ -1287,6 +1288,137 @@ try {
     delete globalThis.__wmOriginalShowOpenDialog;
   });
   console.log('watermark image picker ok: "Chọn ảnh" basename in DOM · full path in state · "Bỏ" clears');
+
+  // 14. Nén PDF lossless: output -nen.pdf, stats before/after, qpdf --check,
+  // dòng “Dung lượng”, không ghi đè (2); raster trang 1 và PDF.js xác nhận trang 2 còn chữ.
+  const compressSrc = path.join(OUT, 'm2-compress.pdf');
+  const compressOut = path.join(OUT, 'm2-compress-out');
+  const compressRasterOut = path.join(OUT, 'm2-compress-raster-out');
+  for (const dir of [compressOut, compressRasterOut]) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  {
+    const cdoc = await PDFDocument.create();
+    const font = await cdoc.embedFont(StandardFonts.Helvetica);
+    for (let i = 0; i < 3; i++) {
+      const page = cdoc.addPage([200, 300]);
+      page.drawText(`Trang ${i + 1} giu chu`, { x: 20, y: 250, size: 14, font });
+    }
+    fs.writeFileSync(compressSrc, await cdoc.save());
+  }
+  const compressBytes = fs.statSync(compressSrc).size;
+
+  await w.evaluate(() => window.__suite.openTool('compress'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'compress');
+  const compressUi = await w.evaluate(() => ({
+    title: window.__suite.state.tool.title,
+    selects: [...document.querySelectorAll('#options select')].map(s => s.value),
+    numbers: [...document.querySelectorAll('#options input[type="number"]')].map(i => i.value),
+    labels: [...document.querySelectorAll('#options .field > label')].map(el => el.textContent),
+  }));
+  assert.equal(compressUi.title, 'Nén PDF');
+  assert.deepEqual(compressUi.selects, ['lossless', 'jpg']);
+  assert.deepEqual(compressUi.numbers, ['150', '80']);
+  for (const re of [/Cách nén/, /Khoảng trang/, /DPI/, /Định dạng ảnh/, /Chất lượng/]) {
+    assert.ok(compressUi.labels.some(t => re.test(t)), `thiếu nhãn ${re}`);
+  }
+  console.log('compress UI ok: lossless mặc định · trang/DPI/định dạng/chất lượng');
+
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: compressSrc, out: compressOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ mode: 'lossless', pages: '', dpi: 150, format: 'jpg', quality: 80 });
+  }, { file: compressSrc, out: compressOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const losslessRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('compress lossless result:', JSON.stringify(losslessRes));
+  if (!losslessRes?.outputs?.length) throw new Error('Nén PDF lossless không tạo output: ' + JSON.stringify(losslessRes));
+  assert.equal(losslessRes.outputs.length, 1);
+  const losslessFile = losslessRes.outputs[0].path;
+  assert.equal(path.basename(losslessFile), 'm2-compress-nen.pdf');
+  assert.equal(path.dirname(path.resolve(losslessFile)), path.resolve(compressOut));
+  assert.equal(losslessRes.stats.mode, 'lossless');
+  assert.equal(losslessRes.stats.beforeBytes, compressBytes);
+  assert.equal(losslessRes.stats.afterBytes, fs.statSync(losslessFile).size);
+  assert.equal(Number.isInteger(losslessRes.stats.savedPercent), true);
+  assert.equal(losslessRes.stats.rasterPages, 0);
+  assert.deepEqual(losslessRes.errors, []);
+  await qpdf(['--check', losslessFile]);
+  const losslessDoc = await PDFDocument.load(fs.readFileSync(losslessFile));
+  assert.equal(losslessDoc.getPageCount(), 3);
+  const losslessPanel = await w.evaluate(() => document.querySelector('#result')?.textContent || '');
+  assert.match(losslessPanel, /Dung lượng: .+ → .+ · (Giảm|Tăng) \d+%/, 'panel phải hiện dung lượng: ' + losslessPanel);
+  assert.equal(losslessPanel.includes(compressSrc), false, 'panel không được lộ đường dẫn');
+  assert.equal(await w.locator('#result .warn').isVisible(), false);
+  console.log('compress lossless ok:', path.basename(losslessFile), '· 3 trang · qpdf --check · stats · dòng dung lượng');
+
+  // Chạy lại cùng thư mục: không ghi đè, nhận tên (2).
+  const firstLosslessBytes = fs.readFileSync(losslessFile);
+  await w.click('#runBtn');
+  const losslessAgain = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('compress lossless again result:', JSON.stringify(losslessAgain));
+  if (!losslessAgain?.outputs?.length) throw new Error('Nén PDF lần hai không tạo output');
+  assert.equal(path.basename(losslessAgain.outputs[0].path), 'm2-compress-nen (2).pdf');
+  assert.deepEqual(fs.readFileSync(losslessFile), firstLosslessBytes, 'file đầu phải giữ nguyên');
+  console.log('compress no-overwrite ok:', path.basename(losslessAgain.outputs[0].path));
+
+  // Raster trang 1: trang 2 vẫn còn lớp chữ, trang 1 thành ảnh và có cảnh báo.
+  await w.evaluate(() => window.__suite.openTool('compress'));
+  await w.waitForFunction(() => window.__suite.state.tool?.id === 'compress');
+  await w.evaluate(({ file, out }) => window.api.suite.registerInput([file, out]), { file: compressSrc, out: compressRasterOut });
+  await w.evaluate(({ file, out }) => {
+    window.__suite.addFiles([file]);
+    window.__suite.setOutputDir(out);
+    window.__suite.setOptions({ mode: 'raster', pages: '1', dpi: 150, format: 'png', quality: 80 });
+  }, { file: compressSrc, out: compressRasterOut });
+  assert.equal(await w.locator('#runBtn').isEnabled(), true);
+  await w.click('#runBtn');
+  const rasterRes = await w.evaluate(() => window.__suite.waitJob(60000));
+  console.log('compress raster result:', JSON.stringify(rasterRes));
+  if (!rasterRes?.outputs?.length) throw new Error('Nén PDF raster không tạo output: ' + JSON.stringify(rasterRes));
+  const rasterFile = rasterRes.outputs[0].path;
+  assert.equal(path.basename(rasterFile), 'm2-compress-nen.pdf');
+  assert.equal(path.dirname(path.resolve(rasterFile)), path.resolve(compressRasterOut));
+  assert.equal(rasterRes.stats.mode, 'raster');
+  assert.equal(rasterRes.stats.rasterPages, 1);
+  assert.equal(rasterRes.stats.beforeBytes, compressBytes);
+  assert.equal(rasterRes.stats.afterBytes, fs.statSync(rasterFile).size);
+  assert.equal(Number.isInteger(rasterRes.stats.savedPercent), true);
+  assert.equal(rasterRes.errors.length, 1);
+  assert.equal(rasterRes.errors[0].code, 'TEXT_LAYER_REMOVED');
+  await qpdf(['--check', rasterFile]);
+  const rasterDoc = await PDFDocument.load(fs.readFileSync(rasterFile));
+  assert.equal(rasterDoc.getPageCount(), 3);
+  assert.ok(pageImageSize(rasterDoc, rasterDoc.getPage(0)), 'trang 1 phải có ảnh XObject');
+  assert.equal(pageImageSize(rasterDoc, rasterDoc.getPage(1)), null, 'trang 2 không được raster');
+  const rasterPanel = await w.evaluate(() => document.querySelector('#result')?.textContent || '');
+  assert.equal(await w.locator('#result .warn').isVisible(), true, 'phải hiện cảnh báo mất lớp chữ');
+  assert.equal(await w.locator('#result .warn').textContent(), 'Các trang đã raster hoá không còn lớp chữ.');
+  assert.match(rasterPanel, /Dung lượng: .+ → .+ · (Giảm|Tăng) \d+%/, 'panel phải hiện dung lượng: ' + rasterPanel);
+  assert.equal(rasterPanel.includes(compressSrc), false, 'panel không được lộ đường dẫn');
+  const rasterText = await w.evaluate(async bytes => {
+    const pdfjs = await import('./vendor/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.min.mjs', location.href).href;
+    const loading = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
+    const doc = await loading.promise;
+    try {
+      const pages = [];
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n);
+        const content = await page.getTextContent();
+        pages.push(content.items.map(i => i.str).join(' '));
+      }
+      return pages;
+    } finally { await loading.destroy(); }
+  }, [...fs.readFileSync(rasterFile)]);
+  assert.equal(rasterText.length, 3);
+  assert.equal(rasterText[0].includes('Trang 1'), false, 'trang raster không còn lớp chữ');
+  assert.match(rasterText[1], /Trang 2 giu chu/, 'trang 2 phải giữ lớp chữ');
+  assert.match(rasterText[2], /Trang 3 giu chu/, 'trang 3 phải giữ lớp chữ');
+  console.log('compress raster ok:', path.basename(rasterFile), '· 1 trang raster · cảnh báo · PDF.js trang 2 còn chữ');
 } finally {
   if (remote) await new Promise(resolve => remote.close(resolve)).catch(() => {});
   await closeApp(app);
