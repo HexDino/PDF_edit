@@ -87,7 +87,7 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 .fi .pin.on{color:#f59e0b}
 .warnGlyph{color:var(--warn);margin-left:4px;cursor:help}
 /* layout */
-#wrap{flex:1;display:flex;min-height:0;position:relative}
+#wrap{flex:1;display:flex;min-height:0;position:relative;overflow:hidden}
 #rail{width:var(--rail);background:#f8fafd;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;flex:none}
 #rail .tool{position:relative;width:56px;height:52px;border:0;background:transparent;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;color:#475569;cursor:pointer}
 #rail .tool .i{width:19px;height:19px;stroke-width:1.7}
@@ -98,8 +98,8 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 #rail .tool.on span{color:var(--blue-d);font-weight:600}
 #rail .railBtn{width:32px;height:32px;padding:0;justify-content:center;border:0;background:transparent;color:#64748b;margin-top:4px}
 #rail .railBtn:hover:not(:disabled){background:#e6efff;color:var(--blue-d)}
-#side{width:var(--thumbs);background:#f5f8fc;border-right:1px solid var(--line);overflow:auto;flex:none;transition:width .14s ease}
-#viewer{flex:1;overflow:auto;position:relative}
+#side{width:var(--thumbs);background:#f5f8fc;border-right:1px solid var(--line);overflow:hidden;flex:none;transition:width .14s ease;display:flex;flex-direction:column;min-height:0}
+#viewer{flex:1;min-width:0;overflow:auto;position:relative}
 #inspector{width:var(--inspector);background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;flex:none;z-index:10}
 .inspHead{height:52px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line)}
 .ctx{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;padding:12px;background:#fff;overscroll-behavior:contain}
@@ -132,31 +132,37 @@ body.thumbs-collapsed #side{width:0;border-right:0;overflow:hidden}
   #rail .tool span{display:none}
   #rail .tool{width:44px;height:44px}
   #rail .tool.on::before{left:-6px;top:8px;bottom:8px}
+  /* Drawer đóng dùng display:none: không cộng vào documentElement.scrollWidth. */
   #side{display:none}
-  body.thumbs-open #side{display:block;position:absolute;left:var(--rail);top:0;bottom:0;width:168px;z-index:25;box-shadow:12px 0 30px rgba(15,23,42,.16)}
-  #inspector{position:absolute;right:0;top:0;bottom:0;width:320px;transform:translateX(100%);transition:transform .16s ease;box-shadow:-18px 0 40px rgba(15,23,42,.16)}
-  body.inspector-open #inspector{transform:none}
+  body.thumbs-open #side{display:flex;position:absolute;left:var(--rail);top:0;bottom:0;width:168px;z-index:25;border-right:1px solid var(--line);box-shadow:12px 0 30px rgba(15,23,42,.16)}
+  #inspector{display:none;position:absolute;right:0;top:0;bottom:0;width:320px;z-index:25;box-shadow:-18px 0 40px rgba(15,23,42,.16)}
+  body.inspector-open #inspector{display:flex}
   #fontPanel{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:min(520px,92vw);max-height:80vh;z-index:90}
-  /* drawer đóng thì không để modal mắc kẹt trong #inspector đã dịch ra ngoài màn hình */
+  /* drawer đóng thì không để modal mắc kẹt trong #inspector ẩn */
   body:not(.inspector-open) #fontPanel{display:none}
   #inspectorToggle{display:grid}
   #inspectorClose{display:grid}
   .topbar .btn .lbl{display:none}
 }
 @media (min-width:1200px){#inspectorToggle,#inspectorClose{display:none}}
-.sideHead{font-size:12px;font-weight:600;color:var(--mut);padding:10px 12px 4px;text-transform:uppercase;letter-spacing:.04em}
-#thumbs{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0 30px}
-.th{position:relative;cursor:pointer;border-radius:4px;padding:3px;border:2px solid transparent}
-.th.cur{border-color:var(--blue)}
-.th canvas{display:block;box-shadow:0 1px 4px rgba(0,0,0,.2);background:#fff}
-.th .n{text-align:center;font-size:11px;color:var(--mut);margin-top:3px}
-.th .tdel{position:absolute;top:6px;right:6px;width:24px;height:24px;padding:0;justify-content:center;font-size:12px;display:none}
+.sideHead{flex:none;height:42px;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 8px 0 12px;border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--mut);background:#f5f8fc;white-space:nowrap}
+.sideHead .sep{color:#9aa6b5;padding:0 1px}
+.sideHead .sideBtn{width:26px;height:26px;padding:0;justify-content:center;border:0;background:transparent;color:var(--mut);border-radius:7px;flex:none}
+.sideHead .sideBtn:hover:not(:disabled){background:#e6efff;color:var(--blue-d);border-color:transparent}
+#thumbs{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:12px;padding:10px 0 30px;overflow-y:auto;overflow-x:hidden}
+.th{position:relative;cursor:pointer;border-radius:8px;padding:3px;border:2px solid transparent;flex:none;transition:background .12s ease,border-color .12s ease}
+.th:hover{background:#eef3fa}
+.th.cur{border-color:var(--blue);background:#e6efff}
+.th canvas{display:block;border-radius:2px;box-shadow:0 1px 3px rgba(15,23,42,.22);background:#fff}
+.th .n{text-align:center;font-size:12px;color:var(--mut);margin-top:3px;font-variant-numeric:tabular-nums}
+.th .tdel{position:absolute;top:5px;right:5px;width:24px;height:24px;padding:0;justify-content:center;font-size:12px;display:none;border-radius:50%;background:#fff;border:1px solid #fecaca;color:#b91c1c;box-shadow:0 2px 6px rgba(15,23,42,.18)}
+.th .tdel:hover{background:#fee2e2;border-color:#fca5a5}
 .th:hover .tdel{display:inline-flex}
 .th.deleted canvas{opacity:.25}.th.deleted .tdel{display:inline-flex}
 #pages{display:flex;flex-direction:column;align-items:center;gap:22px;padding:26px 20px 80px;min-width:max-content}
-.page{position:relative;background:#fff;box-shadow:0 2px 10px rgba(15,23,42,.15),0 0 0 1px rgba(15,23,42,.05)}
+.page{position:relative;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.08),0 10px 30px rgba(15,23,42,.10)}
 .page canvas.pc{display:block}
-.page .num{position:absolute;bottom:-19px;left:0;right:0;text-align:center;font-size:11.5px;color:var(--mut)}
+.page .num{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;line-height:17px;color:var(--mut);background:#fff;border:1px solid var(--line);border-radius:999px;padding:0 9px;box-shadow:0 1px 3px rgba(15,23,42,.08)}
 .page .delOv{position:absolute;inset:0;background:rgba(239,68,68,.12);display:none;place-items:center;z-index:30;backdrop-filter:grayscale(1)}
 .page.deleted .delOv{display:grid}
 .delOv div{background:#fff;border:1px solid #fecaca;color:#b91c1c;padding:12px 16px;border-radius:10px;font-weight:600;display:flex;gap:10px;align-items:center}
@@ -165,25 +171,28 @@ body.tool-text .layer{cursor:text}
 body.tool-erase .layer,body.tool-pen .layer,body.tool-hl .layer,body.tool-pick .layer,body.tool-place .layer{cursor:crosshair}
 #empty{position:absolute;inset:0;display:grid;place-items:center;padding:20px}
 #empty[hidden]{display:none}
-.drop{width:min(560px,100%);background:#fff;border:2px dashed #b9c5d6;border-radius:18px;padding:40px 30px;text-align:center}
-.drop h2{margin:10px 0 6px;font-size:21px}.drop p{margin:0 0 18px;color:var(--mut);font-size:14px;line-height:1.55}
-.drop .big{font-size:44px}.drop .hand{font-size:30px;color:var(--ink);margin:4px 0 18px}
+.drop{width:min(520px,100%);background:#fff;border:1.5px dashed #b9c5d6;border-radius:14px;padding:36px 28px;text-align:center;box-shadow:0 8px 24px rgba(15,23,42,.10)}
+.drop .emptyIcon{width:56px;height:56px;margin:0 auto;display:grid;place-items:center;border-radius:14px;background:#e6efff;color:var(--blue)}
+.drop .emptyIcon .i{width:28px;height:28px;stroke-width:1.6}
+.drop h2{margin:12px 0 6px;font-size:21px}.drop p{margin:0 0 18px;color:var(--mut);font-size:14px;line-height:1.55}
+.drop .hand{font-size:28px;color:var(--ink);margin:4px 0 18px}
+.drop #openBtn2{height:38px;padding:0 16px}
 body.dragging main{outline:3px dashed var(--blue);outline-offset:-8px}
 /* objects */
 .obj{position:absolute;outline:1px dashed transparent;outline-offset:2px}
-.obj.sel{outline:1.5px dashed var(--blue)}
+.obj.sel{outline:1.5px solid var(--blue)}
 body:not(.tool-select) .obj:not(.tb):not(.sel){pointer-events:none}
 body.tool-erase .obj:not(.sel),body.tool-pen .obj:not(.sel),body.tool-hl .obj:not(.sel),body.tool-place .obj:not(.sel),body.tool-pick .obj{pointer-events:none}
 body.tool-select .obj{cursor:move}
-.obj .tools{position:absolute;left:-4px;top:-33px;display:none;gap:3px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px;box-shadow:0 4px 12px rgba(15,23,42,.12);white-space:nowrap;z-index:5;pointer-events:auto}
+.obj .tools{position:absolute;left:-1px;top:-34px;display:none;gap:3px;background:#fff;border:1px solid var(--line);border-radius:9px;padding:3px;box-shadow:0 6px 18px rgba(15,23,42,.14);white-space:nowrap;z-index:5;pointer-events:auto}
 .obj.sel .tools{display:flex}
-.obj .tools button{height:24px;width:26px;padding:0;justify-content:center;font-size:13px;border:0;border-radius:6px}
+.obj .tools button{height:26px;width:28px;padding:0;justify-content:center;font-size:13px;border:0;border-radius:6px}
 .obj .tools .mv{cursor:move}
 .obj .tools .del:hover{background:#fee2e2;color:#b91c1c}
-.obj .rs{position:absolute;right:-8px;bottom:-8px;width:13px;height:13px;border-radius:3px;background:#fff;border:2px solid var(--blue);cursor:nwse-resize;display:none;z-index:5;pointer-events:auto}
-.obj .ro{position:absolute;left:50%;top:-26px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:2px solid var(--blue);cursor:grab;display:none;z-index:5;pointer-events:auto}
+.obj .rs{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border-radius:4px;background:#fff;border:2px solid var(--blue);box-shadow:0 1px 3px rgba(15,23,42,.2);cursor:nwse-resize;display:none;z-index:5;pointer-events:auto}
+.obj .ro{position:absolute;left:50%;top:-28px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:2px solid var(--blue);box-shadow:0 1px 3px rgba(15,23,42,.2);cursor:grab;display:none;z-index:5;pointer-events:auto}
 .obj.sel .rs,.obj.sel .ro{display:block}
-.obj.im .tools{top:-58px}
+.obj.im .tools{top:-62px}
 .rc{border-radius:0}
 .im img{width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
 .ink{pointer-events:none}

@@ -221,6 +221,7 @@ async function openBytes(bytes, name, path) {
       pages.push(pg);
       buildThumb(pg);
     }
+    $('thumbCount').textContent = doc.numPages;
     fitWidth(true); updateButtons(); setDirty(false);
     status(`${origName} · ${doc.numPages} trang`);
     renderThumbs();
@@ -275,19 +276,34 @@ const STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5
 const zoomIn = () => setZoom(STEPS.find(s => s > zoom + 0.001) || 5);
 const zoomOut = () => setZoom([...STEPS].reverse().find(s => s < zoom - 0.001) || 0.25);
 $('zoomIn').onclick = zoomIn; $('zoomOut').onclick = zoomOut; $('zoomFit').onclick = () => fitWidth(false);
+/* Trạng thái aria cho hai panel: chỉ trình bày, không đổi layout. */
+function syncPanelAria() {
+  const narrow = matchMedia('(max-width:1199px)').matches;
+  const thumbsOpen = narrow ? document.body.classList.contains('thumbs-open') : !document.body.classList.contains('thumbs-collapsed');
+  $('thumbsToggle').setAttribute('aria-expanded', String(thumbsOpen));
+  $('inspectorToggle').setAttribute('aria-expanded', String(document.body.classList.contains('inspector-open')));
+}
 $('thumbsToggle').onclick = () => {
   const narrow = matchMedia('(max-width:1199px)').matches;
   document.body.classList.toggle(narrow ? 'thumbs-open' : 'thumbs-collapsed');
+  syncPanelAria();
 };
-$('inspectorToggle').onclick = () => { closePicker(); document.body.classList.toggle('inspector-open'); };
-$('inspectorClose').onclick = () => { closePicker(); document.body.classList.remove('inspector-open'); };
+$('thumbsCollapse').onclick = () => {
+  if (matchMedia('(max-width:1199px)').matches) document.body.classList.remove('thumbs-open');
+  else document.body.classList.add('thumbs-collapsed');
+  syncPanelAria();
+};
+$('inspectorToggle').onclick = () => { closePicker(); document.body.classList.toggle('inspector-open'); syncPanelAria(); };
+$('inspectorClose').onclick = () => { closePicker(); document.body.classList.remove('inspector-open'); syncPanelAria(); };
 $('viewer').addEventListener('wheel', e => { if (e.ctrlKey && pages.length) { e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); } }, { passive: false });
 let rT, narrowView = matchMedia('(max-width:1199px)').matches;
 window.addEventListener('resize', () => {
   const narrow = matchMedia('(max-width:1199px)').matches;
   if (narrow !== narrowView) { narrowView = narrow; closePicker(); }
+  syncPanelAria();
   clearTimeout(rT); rT = setTimeout(() => { pages.forEach(p => p.rendered = -1); renderAll(); }, 200);
 });
+syncPanelAria();
 
 function buildThumb(pg) {
   const th = document.createElement('div'); th.className = 'th';
@@ -298,8 +314,8 @@ function buildThumb(pg) {
 }
 async function renderThumbs() {
   for (const pg of pages) {
-    const s = 110 / pg.vp1.width, vp = pg.pdfPage.getViewport({ scale: s * 2 });
-    const c = pg.thumb.querySelector('canvas'); c.width = vp.width; c.height = vp.height; c.style.width = '110px'; c.style.height = pg.vp1.height * s + 'px';
+    const s = 120 / pg.vp1.width, vp = pg.pdfPage.getViewport({ scale: s * 2 });
+    const c = pg.thumb.querySelector('canvas'); c.width = vp.width; c.height = vp.height; c.style.width = '120px'; c.style.height = pg.vp1.height * s + 'px';
     try { await pg.pdfPage.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; } catch {}
   }
 }

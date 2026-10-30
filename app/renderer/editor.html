@@ -64,7 +64,7 @@
       <button id="zoomIn" class="iconBtn" title="Phóng to (Ctrl +)" aria-label="Phóng to"><svg class="i"><use href="#i-plus"/></svg></button>
       <button id="zoomFit" class="iconBtn" title="Vừa chiều rộng" aria-label="Vừa chiều rộng"><svg class="i"><use href="#i-fit"/></svg></button>
     </div>
-    <button id="inspectorToggle" class="iconBtn" title="Thuộc tính" aria-label="Mở thuộc tính"><svg class="i"><use href="#i-panel-right"/></svg></button>
+    <button id="inspectorToggle" class="iconBtn" title="Thuộc tính" aria-label="Mở thuộc tính" aria-controls="inspector" aria-expanded="false"><svg class="i"><use href="#i-panel-right"/></svg></button>
   </header>
 
   <div id="wrap">
@@ -77,29 +77,29 @@
       <button class="tool" data-tool="pen" title="Bút vẽ (P)" aria-label="Bút vẽ (P)"><svg class="i"><use href="#i-pen"/></svg><span>Bút</span></button>
       <button class="tool" data-tool="hl" title="Bút dạ quang (H)" aria-label="Bút dạ quang (H)"><svg class="i"><use href="#i-highlight"/></svg><span>Dạ quang</span></button>
       <span class="grow"></span>
-      <button id="thumbsToggle" class="iconBtn railBtn" title="Ẩn/hiện trang" aria-label="Ẩn/hiện trang"><svg class="i"><use href="#i-panel-left"/></svg></button>
+      <button id="thumbsToggle" class="iconBtn railBtn" title="Ẩn/hiện trang" aria-label="Ẩn/hiện trang" aria-controls="side" aria-expanded="true"><svg class="i"><use href="#i-panel-left"/></svg></button>
     </nav>
 
     <aside id="side">
-      <div class="sideHead">Trang</div>
+      <div class="sideHead"><span>Trang <span class="sep">·</span> <span id="thumbCount">0</span></span><button id="thumbsCollapse" class="sideBtn" title="Thu gọn danh sách trang" aria-label="Thu gọn danh sách trang" aria-controls="side"><svg class="i sm"><use href="#i-back"/></svg></button></div>
       <div id="thumbs"></div>
     </aside>
 
     <main id="viewer">
       <div id="empty">
         <div class="drop">
-          <div class="big">📄</div>
+          <div class="emptyIcon"><svg class="i"><use href="#i-file"/></svg></div>
           <h2>Mở file PDF để bắt đầu</h2>
           <p>Hỗ trợ PDF scan (chỉ có ảnh) và PDF chữ thường.<br>Kéo thả file vào đây hoặc bấm nút bên dưới. Mọi thứ xử lý ngay trên máy, không cần mạng.</p>
           <div class="hand" id="heroHand">Xin chào, Đồng ý ký tên</div>
-          <button class="primary" id="openBtn2">📂 Chọn file PDF</button>
+          <button class="primary" id="openBtn2"><svg class="i"><use href="#i-folder"/></svg>Chọn file PDF</button>
         </div>
       </div>
       <div id="pages" hidden></div>
     </main>
 
     <aside id="inspector" aria-label="Thuộc tính">
-      <div class="inspHead"><b>Thuộc tính</b><button id="inspectorClose" class="iconBtn" title="Đóng">✕</button></div>
+      <div class="inspHead"><b>Thuộc tính</b><button id="inspectorClose" class="iconBtn" title="Đóng" aria-label="Đóng thuộc tính">✕</button></div>
       <div class="ctx">
         <!-- Chữ -->
         <div class="sec" data-ctx="text">
