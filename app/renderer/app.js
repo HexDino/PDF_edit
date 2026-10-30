@@ -84,6 +84,7 @@ function busy(on, txt) { $('busy').classList.toggle('show', on); if (txt) $('bus
 function status(txt, st = 'ok') { $('status').textContent = txt; $('dot').className = 'dot ' + st; }
 function setDirty(d) {
   dirty = d; API?.setDirty(d);
+  document.body.classList.toggle('dirty', d);
   document.title = (d ? '• ' : '') + (pdfDoc ? origName + ' – ' : '') + 'Trình sửa PDF';
   if (d && origPath) sessionTag('dirty');
 }
@@ -199,6 +200,7 @@ async function openBytes(bytes, name, path) {
       standardFontDataUrl: new URL('./vendor/standard_fonts/', import.meta.url).href }).promise;
     if (pdfDoc) pdfDoc.destroy();
     pdfDoc = doc; origBytes = bytes; origName = name || 'tai-lieu.pdf'; origPath = path; lastSavePath = null;
+    $('fileTitle').textContent = origName || 'Chưa mở file';
     objects.forEach(o => o.el?.remove()); objects = []; history.length = 0; selected = null;
     for (const k in imgStore) delete imgStore[k]; srcSeq = 1; pendingPlace = null;   // dọn ảnh của file trước, tránh rò rỉ bộ nhớ
     $('empty').hidden = true; $('pages').hidden = false; $('pages').innerHTML = ''; $('thumbs').innerHTML = '';
@@ -273,6 +275,12 @@ const STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5
 const zoomIn = () => setZoom(STEPS.find(s => s > zoom + 0.001) || 5);
 const zoomOut = () => setZoom([...STEPS].reverse().find(s => s < zoom - 0.001) || 0.25);
 $('zoomIn').onclick = zoomIn; $('zoomOut').onclick = zoomOut; $('zoomFit').onclick = () => fitWidth(false);
+$('thumbsToggle').onclick = () => {
+  const narrow = matchMedia('(max-width:1199px)').matches;
+  document.body.classList.toggle(narrow ? 'thumbs-open' : 'thumbs-collapsed');
+};
+$('inspectorToggle').onclick = () => document.body.classList.toggle('inspector-open');
+$('inspectorClose').onclick = () => document.body.classList.remove('inspector-open');
 $('viewer').addEventListener('wheel', e => { if (e.ctrlKey && pages.length) { e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); } }, { passive: false });
 let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { pages.forEach(p => p.rendered = -1); renderAll(); }, 200); });
 
@@ -368,7 +376,7 @@ $('autoFillBtn').onclick = () => {
   else toast('Hãy chọn một vùng che trước (hoặc vẽ vùng mới, màu sẽ tự lấy)');
 };
 $('pickBtn').onclick = () => { if (!pdfDoc) return; setTool('pick'); toast('Bấm vào chỗ có màu nền muốn lấy'); };
-document.querySelector('header').addEventListener('pointerdown', e => { if (e.target.closest('input,label,#fontPanel')) return; e.preventDefault(); });
+document.querySelector('#chrome').addEventListener('pointerdown', e => { if (e.target.closest('input,label,#fontPanel,select,textarea')) return; e.preventDefault(); });
 
 /* ======================= Lấy màu từ trang đã vẽ ======================= */
 function canvasScale(pg) { return pg.canvas.width / pg.vp1.width; }
@@ -1463,6 +1471,7 @@ async function doSave(saveAs, trueRemove) {
       where = await API.savePdf({ data: bytes, path: saveAs ? null : lastSavePath, defaultPath: lastSavePath || def });
       if (!where) return;
       lastSavePath = where;
+      $('fileTitle').textContent = where.split(/[\\/]/).pop();
     } else {
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       const a = document.createElement('a'); a.href = url; a.download = saveName(); document.body.appendChild(a); a.click(); a.remove();
