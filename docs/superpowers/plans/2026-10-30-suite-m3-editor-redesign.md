@@ -418,13 +418,41 @@ git commit -m "M3: inspector thuộc tính và font flyout"
 ### Task 4: Canvas, thumbnail thu gọn và responsive 900×600
 
 **Files:**
-- Modify: `app/renderer/styles.css` (canvas/thumbnail/object/empty)
+- Modify: `app/renderer/styles.css` (canvas/thumbnail/object/empty, drawer containment)
 - Modify: `app/renderer/editor.html` (page number pill, thumbnail header)
+- Modify: `app/renderer/app.js` (aria-expanded cho toggle; đóng picker khi resize — presentation)
 - Test: `test/overlay.mjs`, `test/erase.mjs`, `test/rotation.mjs`, `test/editing.mjs`
 
 **Interfaces:**
 - Consumes: `#side`, `#thumbs`, `#viewer`, `#pages`, body classes Task 1.
-- Produces: `body.thumbs-collapsed`/`thumbs-open` hoạt động; `#empty` card mới; page pill.
+- Produces: `body.thumbs-collapsed`/`thumbs-open` hoạt động; `#empty` card mới; page pill; drawer không làm tăng `documentElement.scrollWidth`; `aria-expanded` đúng.
+
+- [ ] **Step 0: Chứa drawer trong layout + aria-expanded**
+
+CSS tại `<1200` dùng `display:none` thay vì trượt off-screen, để drawer đóng không cộng vào `documentElement.scrollWidth`:
+
+```css
+@media (max-width:1199px){
+  #inspector{display:none;position:absolute;right:0;top:0;bottom:0;width:320px;z-index:25;box-shadow:-18px 0 40px rgba(15,23,42,.16)}
+  body.inspector-open #inspector{display:flex}
+  #side{display:none}
+  body.thumbs-open #side{display:block;position:absolute;left:var(--rail);top:0;bottom:0;width:168px;z-index:25;box-shadow:12px 0 30px rgba(15,23,42,.16)}
+}
+#wrap{overflow:hidden}
+```
+
+`app.js` (trình bày): thêm `syncPanelAria()` và gọi sau mỗi toggle + khi resize:
+
+```js
+function syncPanelAria() {
+  const narrow = matchMedia('(max-width:1199px)').matches;
+  const thumbsOpen = narrow ? document.body.classList.contains('thumbs-open') : !document.body.classList.contains('thumbs-collapsed');
+  $('thumbsToggle').setAttribute('aria-expanded', String(thumbsOpen));
+  $('inspectorToggle').setAttribute('aria-expanded', String(document.body.classList.contains('inspector-open')));
+}
+```
+
+Test trong `editing.mjs` ở 900×600: `document.documentElement.scrollWidth <= window.innerWidth + 1`; bấm `#thumbsToggle` → `#side` hiện, `aria-expanded=true`; đóng; bấm `#inspectorToggle` → `#inspector` hiện, `aria-expanded=true`; đóng.
 
 - [ ] **Step 1: Test responsive**
 
