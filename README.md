@@ -10,8 +10,8 @@ Mọi thao tác chạy trên máy: không upload file, không telemetry. Mạng 
 
 Tải ở trang [GitHub Releases](https://github.com/HexDino/PDF_edit/releases/latest):
 
-- **`TrinhSuaPDF-1.2.0-portable.exe`** — chạy ngay, không cần cài đặt.
-- **`TrinhSuaPDF-1.2.0-Setup.exe`** — bộ cài NSIS, tạo lối tắt và liên kết file PDF.
+- **`TrinhSuaPDF-2.0.0-portable.exe`** — chạy ngay, không cần cài đặt.
+- **`TrinhSuaPDF-2.0.0-Setup.exe`** — bộ cài NSIS, tạo lối tắt và liên kết file PDF.
 - **`SHA256SUMS.txt`** — mã kiểm tra toàn vẹn của các file tải về.
 
 Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows SmartScreen có thể cảnh báo lần đầu — chọn *More info → Run anyway* sau khi đã kiểm tra SHA-256.
@@ -61,8 +61,9 @@ Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows Smart
 - Lỗi hiển thị ngắn gọn bằng tiếng Việt; chi tiết kỹ thuật chỉ ghi log cục bộ.
 - PDF có mật khẩu → báo cần mở khoá trước; PDF hỏng → báo file không đọc được.
 
-### Trình sửa PDF (giữ nguyên từ bản 1.x)
+### Trình sửa PDF (giữ nguyên chức năng, giao diện M3 canvas-first)
 
+- **Giao diện M3**: top bar 56 px, rail công cụ bên trái, inspector thuộc tính bên phải, thumbnail thu gọn được; responsive 900×600 với drawer.
 - Mở PDF thường hoặc PDF scan nhiều trang; zoom, cuộn, thumbnail.
 - **29 phông** viết tay/in, đủ dấu tiếng Việt, có tìm kiếm, ghim phông và chữ xem trước.
 - **Tẩy/che** 3 kiểu (khung, cọ, khoanh vùng), bám dòng chữ, nền màu/chuyển sắc/sao chép, mờ mép, chọn PNG/JPEG và DPI khi “xoá hẳn”.
@@ -77,10 +78,13 @@ Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows Smart
 |---|---|
 | ![Công cụ số trang](docs/screenshot-stamp-tool.png) | ![Công cụ watermark](docs/screenshot-watermark-tool.png) |
 
-Ảnh editor (từ bản cũ, giao diện editor sẽ được thiết kế lại ở mốc M3):
+### Trình sửa PDF — giao diện M3
 
-![Tẩy/che trên PDF](docs/screenshot-erase-tool.png)
-![Đặt chữ ký lên trang](docs/screenshot-signature-placed.png)
+![Editor M3 1400×900](docs/m3-editor-final-1400.png)
+
+| 900×600 | Drawer thuộc tính 900×600 |
+|---|---|
+| ![Editor M3 900×600](docs/m3-editor-final-900.png) | ![Drawer thuộc tính](docs/m3-editor-drawer-900.png) |
 
 ## Cài đặt và chạy
 
@@ -116,8 +120,8 @@ npm run build        # prebuild tự chạy fetch:qpdf
 
 Kết quả trong `app/dist/`:
 
-- `TrinhSuaPDF-1.2.0-portable.exe` — chạy ngay, không cần cài.
-- `TrinhSuaPDF-1.2.0-Setup.exe` — bộ cài NSIS.
+- `TrinhSuaPDF-2.0.0-portable.exe` — chạy ngay, không cần cài.
+- `TrinhSuaPDF-2.0.0-Setup.exe` — bộ cài NSIS.
 
 Ghi chú:
 
@@ -229,7 +233,7 @@ Hậu tố theo công cụ: `-ghep`, `-tach/`, `-xoa-trang`, `-trich-trang`, `-t
 - PDF → ảnh giới hạn cạnh dài 10.000 px (DPI bị hạ theo tỉ lệ).
 - Watermark chữ dùng cố định Be Vietnam Pro, chưa cho chọn phông; chữ quá lớn có thể bị cắt ở mép trang. Watermark ảnh luôn thu vừa trang và không phóng to.
 - Editor: không xoay hướng trang, không mở PDF có mật khẩu; “xoá hẳn” biến trang bị che thành ảnh (mất lớp chữ trên trang đó); file `.tsp.json` chứa nội dung đã thêm nên không gửi kèm khi chia sẻ PDF.
-- Chưa có thumbnail kéo-thả, preview crop, file gần đây, màn hình cài đặt; editor sẽ được thiết kế lại ở mốc M3.
+- Editor M3 đã có giao diện canvas-first; chưa có thumbnail kéo-thả, preview crop, file gần đây, màn hình cài đặt.
 - File `.exe` chưa ký số.
 
 ## Giấy phép
