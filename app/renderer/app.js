@@ -411,7 +411,7 @@ $('autoFillBtn').onclick = () => {
   else toast('Hãy chọn một vùng che trước (hoặc vẽ vùng mới, màu sẽ tự lấy)');
 };
 $('pickBtn').onclick = () => { if (!pdfDoc) return; setTool('pick'); toast('Bấm vào chỗ có màu nền muốn lấy'); };
-document.querySelector('#chrome').addEventListener('pointerdown', e => { if (e.target.closest('input,label,#fontPanel,select,textarea')) return; e.preventDefault(); });
+document.querySelector('#chrome').addEventListener('pointerdown', e => { if (e.target.closest('input,label,#fontPanel,select,textarea,#viewer')) return; e.preventDefault(); });
 
 /* ======================= Lấy màu từ trang đã vẽ ======================= */
 function canvasScale(pg) { return pg.canvas.width / pg.vp1.width; }

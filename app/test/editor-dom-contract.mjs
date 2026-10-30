@@ -101,6 +101,17 @@ try {
   }));
   if (!switched.tool) throw new Error('tool class not switched');
   if (!switched.dirty || !switched.drawer) throw new Error('setTool cleared state classes: ' + JSON.stringify(switched));
+  const guard = await w.evaluate(() => {
+    const fire = sel => {
+      const ev = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+      document.querySelector(sel).dispatchEvent(ev);
+      return ev.defaultPrevented;
+    };
+    return { page: fire('#pages'), topbar: fire('#fileTitle'), input: fire('#fontSearch') };
+  });
+  if (guard.page) throw new Error('pointerdown trên canvas bị preventDefault: ' + JSON.stringify(guard));
+  if (!guard.topbar) throw new Error('pointerdown trên top bar không còn được guard: ' + JSON.stringify(guard));
+  if (guard.input) throw new Error('pointerdown trên input bị preventDefault: ' + JSON.stringify(guard));
   console.log('editor DOM contract ok · 5 tools · 7 property sections');
 } finally {
   await closeApp(app);
