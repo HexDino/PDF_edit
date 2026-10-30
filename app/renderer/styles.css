@@ -13,9 +13,9 @@ body{font-family:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif;color:var(--tx
 .topbar{height:var(--topbar);background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 10px;z-index:20;flex-wrap:nowrap}
 .fileMeta{display:flex;flex-direction:column;gap:1px;min-width:150px;max-width:260px;flex:0 1 260px;margin-right:4px}
 .fileName{font-size:14px;line-height:1.25;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fileSub{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden}
-.fileSub #status{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.fileSub #sessionTag{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fileSub{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden}
+.fileSub #status{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fileSub #sessionTag{flex:0 1 auto;min-width:0;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.dirty .fileSub .dot.ok{background:#f59e0b;box-shadow:0 0 0 3px #fef3c7}
 .grow{flex:1;min-width:0}
 .topbar .grp{display:flex;align-items:center;gap:5px;padding:0 8px;border-left:1px solid var(--line);height:32px;flex:none}
@@ -37,7 +37,7 @@ body.dirty .fileSub .dot.ok{background:#f59e0b;box-shadow:0 0 0 3px #fef3c7}
 .menu .pop button:hover:not(:disabled){background:#f1f5fb;border-color:transparent}
 .menu .pop .i{width:16px;height:16px;color:var(--mut)}
 .menu .pop button:hover:not(:disabled) .i{color:var(--blue-d)}
-.ctx .hint{font-size:12.5px;color:var(--mut)}
+.ctx .hintTxt{font-size:12.5px;color:var(--mut);line-height:1.45}
 .warn{font-size:12px;color:var(--warn);background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:4px 8px;max-width:520px}
 button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:#fff;color:var(--txt);height:32px;padding:0 11px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 button:hover:not(:disabled){background:#f3f6fb;border-color:#c3ccd9}
@@ -66,9 +66,11 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;flex:none}.dot.ok{background:#10b981}.dot.err{background:#ef4444}
 /* font picker */
 .fp{position:relative}
-#fontBtn{min-width:200px;justify-content:space-between;font-size:17px}
-#fontBtn .cv{font-family:"Be Vietnam Pro";font-size:10px;color:var(--mut)}
-#fontPanel{position:absolute;top:38px;left:0;width:460px;max-height:min(70vh,620px);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(15,23,42,.18);padding:6px;display:none;z-index:60}
+#fontBtn{min-width:0;width:100%;justify-content:space-between;font-size:17px;height:46px;padding:0 12px;gap:8px}
+#fontBtnTxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#fontBtn .cv{font-family:"Be Vietnam Pro";font-size:10px;color:var(--mut);flex:none}
+/* fixed để không bị .ctx (scroll) cắt; đặt ngay bên trái inspector */
+#fontPanel{position:fixed;left:auto;right:calc(var(--inspector) + 16px);top:108px;width:380px;max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(15,23,42,.18);padding:6px;display:none;z-index:60}
 #fontPanel.open{display:block}
 .fpBar{position:sticky;top:-6px;z-index:2;display:flex;gap:6px;padding:4px 4px 8px;background:#fff;border-bottom:1px solid #eef1f5}
 #fontPanel .fpBar input{font:inherit;font-size:13px;height:30px;border:1px solid var(--line);border-radius:8px;padding:0 9px;background:#fff;color:var(--txt)}
@@ -100,10 +102,23 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 #viewer{flex:1;overflow:auto;position:relative}
 #inspector{width:var(--inspector);background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;flex:none;z-index:10}
 .inspHead{height:52px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line)}
-/* Task 1: chưa đặt overflow để #fontPanel tuyệt đối không bị cắt; Task 3 sẽ chuyển panel sang fixed rồi mới cho scroll. */
-.ctx{flex:1;overflow:visible;display:flex;flex-direction:column;gap:10px;padding:12px;background:#fff}
-.ctx .sec{display:none;flex-direction:column;gap:8px;padding:12px;border:1px solid #e8edf4;border-radius:10px}
+.ctx{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;padding:12px;background:#fff;overscroll-behavior:contain}
+.ctx .sec{display:none;flex:none;flex-direction:column;gap:8px;padding:12px;border:1px solid #e8edf4;border-radius:10px;background:#fff}
 .ctx .sec.show{display:flex}
+.ctx .sec h4{margin:0 0 2px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.ctx .sec .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
+.ctx .sec .lbl{font-size:12px}
+.ctx .sec .warn{max-width:none}
+.ctx .sec .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:end}
+.ctx .sec .fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ctx .sec .fld input[type=number],.ctx .sec .fld select{width:100%;min-width:0}
+.ctx .sec .fld button{width:100%;justify-content:center}
+.ctx .seg{display:flex}
+.ctx .seg button{flex:1 1 0;min-width:0;justify-content:center;border-radius:0;padding:0 6px;font-size:12.5px}
+.ctx .seg button+button{border-left:0}
+.ctx .seg button:first-child{border-radius:8px 0 0 8px}
+.ctx .seg button:last-child{border-radius:0 8px 8px 0}
+.ctx .seg button.on{position:relative;z-index:1;box-shadow:inset 0 0 0 1px var(--blue)}
 .hintBar{height:var(--hint);background:#fbfcfe;border-top:1px solid #eef1f5;display:flex;align-items:center;padding:0 14px;font-size:11.5px;color:var(--mut)}
 body.thumbs-collapsed #side{width:0;border-right:0;overflow:hidden}
 @media (max-width:1199px){
@@ -121,6 +136,9 @@ body.thumbs-collapsed #side{width:0;border-right:0;overflow:hidden}
   body.thumbs-open #side{display:block;position:absolute;left:var(--rail);top:0;bottom:0;width:168px;z-index:25;box-shadow:12px 0 30px rgba(15,23,42,.16)}
   #inspector{position:absolute;right:0;top:0;bottom:0;width:320px;transform:translateX(100%);transition:transform .16s ease;box-shadow:-18px 0 40px rgba(15,23,42,.16)}
   body.inspector-open #inspector{transform:none}
+  #fontPanel{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:min(520px,92vw);max-height:80vh;z-index:90}
+  /* drawer đóng thì không để modal mắc kẹt trong #inspector đã dịch ra ngoài màn hình */
+  body:not(.inspector-open) #fontPanel{display:none}
   #inspectorToggle{display:grid}
   #inspectorClose{display:grid}
   .topbar .btn .lbl{display:none}

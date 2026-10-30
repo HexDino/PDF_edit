@@ -38,6 +38,11 @@ for (const [src, dst] of [['scan-test.pdf', SCAN], ['text-doc.pdf', TEXT]]) {
 }
 await openPdf(SCAN);
 await w.click('[data-tool="erase"]');
+const visible = await w.evaluate(() => [...document.querySelectorAll('.ctx .sec')].filter(s => s.classList.contains('show')).map(s => s.dataset.ctx));
+if (!visible.includes('erase rect')) throw new Error('Inspector không hiện nhóm tẩy xoá: ' + visible);
+const rect = await w.evaluate(() => { const s = document.querySelector('.ctx'); const r = s.getBoundingClientRect(); return { w: r.width, top: r.top }; });
+if (rect.w < 260) throw new Error('Inspector quá hẹp: ' + rect.w);
+console.log('inspector ok:', JSON.stringify({ visible, width: rect.w }));
 await dragRect(0, 140, 196, 330, 214);         // che dòng chấm "Họ và tên: ....."
 let o = await objs(); console.log('rect after draw:', JSON.stringify(o[0]));
 await w.keyboard.type('');
