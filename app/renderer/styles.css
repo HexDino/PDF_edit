@@ -105,7 +105,7 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 .ctx{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;padding:12px;background:#fff;overscroll-behavior:contain}
 .ctx .sec{display:none;flex:none;flex-direction:column;gap:8px;padding:12px;border:1px solid #e8edf4;border-radius:10px;background:#fff}
 .ctx .sec.show{display:flex}
-.ctx .sec h4{margin:0 0 2px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.ctx .sec h4{margin:0 0 2px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:700}
 .ctx .sec .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
 .ctx .sec .lbl{font-size:12px}
 .ctx .sec .warn{max-width:none}
@@ -114,7 +114,7 @@ select{font:inherit;font-size:13.5px;height:32px;border:1px solid var(--line);bo
 .ctx .sec .fld input[type=number],.ctx .sec .fld select{width:100%;min-width:0}
 .ctx .sec .fld button{width:100%;justify-content:center}
 .ctx .seg{display:flex}
-.ctx .seg button{flex:1 1 0;min-width:0;justify-content:center;border-radius:0;padding:0 6px;font-size:12.5px}
+.ctx .seg button{flex:1 1 0;min-width:0;justify-content:center;border-radius:0;padding:0 4px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
 .ctx .seg button+button{border-left:0}
 .ctx .seg button:first-child{border-radius:8px 0 0 8px}
 .ctx .seg button:last-child{border-radius:0 8px 8px 0}

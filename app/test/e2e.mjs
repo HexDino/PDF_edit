@@ -6,12 +6,22 @@ import { APP_ROOT, OUT, electronBin, testFile, electronEnv, sigLibDir, closeApp 
 fs.mkdirSync(OUT, { recursive: true });
 
 const app = await electron.launch({ executablePath: electronBin, args: [APP_ROOT, '--no-sandbox'], env: electronEnv });
-const w = await app.firstWindow(); await w.setViewportSize({width:1500,height:940}).catch(()=>{});
+const w = await app.firstWindow();
 const logs=[]; w.on('console', m => { if (m.type()==='error'||m.type()==='warning') logs.push(m.type()+': '+m.text()); }); w.on('pageerror', e => logs.push('PAGEERROR '+e.message));
-await app.evaluate(({BrowserWindow})=>{ const b=BrowserWindow.getAllWindows()[0]; b.unmaximize(); b.setSize(1500,960); });
+// Đặt đúng kích thước vùng nội dung; app tự maximize lúc mở nên phải unmaximize xong mới resize được.
+async function setContentSize(width, height) {
+  await app.evaluate(async ({BrowserWindow}, size) => {
+    const b = BrowserWindow.getAllWindows()[0];
+    if (b.isMaximized()) b.unmaximize();
+    for (let i = 0; i < 60 && b.isMaximized(); i++) await new Promise(r => setTimeout(r, 50));
+    b.setContentSize(size[0], size[1]);
+  }, [width, height]);
+  await w.waitForFunction(([width, height]) => innerWidth === width && innerHeight === height, [width, height], { timeout: 5000 });
+}
 let savePath=null;
 const setSave = p => app.evaluate(({dialog}, p)=>{ dialog.showSaveDialog = async()=>({canceled:false, filePath:p}); }, p);
 await w.waitForFunction(() => window.__app && document.querySelectorAll('#fontList .fi').length === window.__app.FONTS.length);
+await setContentSize(1500, 940);
 const A = (fn, arg) => w.evaluate(fn, arg);
 async function openPdf(file){ await A(async(b64)=>{const s=atob(b64.d);const u=new Uint8Array(s.length);for(let i=0;i<u.length;i++)u[i]=s.charCodeAt(i);await window.__app.openBytes(u,b64.n,b64.path);},{d:fs.readFileSync(file).toString('base64'),n:file.split('/').pop(),path:file});
   await w.waitForFunction(()=>window.__app.pages.every(p=>p.rendered>0)); }
@@ -37,12 +47,81 @@ for (const [src, dst] of [['scan-test.pdf', SCAN], ['text-doc.pdf', TEXT]]) {
   if (fs.existsSync(dst.replace(/\.pdf$/i, '') + '.tsp.json')) fs.unlinkSync(dst.replace(/\.pdf$/i, '') + '.tsp.json');
 }
 await openPdf(SCAN);
+// Đo hình học inspector ở đúng 1400×900 và 900×600, rồi trả cửa sổ về 1500×940.
+const segWidths = () => w.evaluate(() => [...document.querySelectorAll('.ctx .seg button')].map(b => ({ label: b.textContent.trim(), scroll: b.scrollWidth, client: b.clientWidth })));
+function assertNoOverflow(rows, where) {
+  const bad = rows.filter(r => r.scroll > r.client);
+  if (bad.length) throw new Error(`Nhãn kiểu xoá tràn ở ${where}: ` + JSON.stringify(bad));
+}
+async function closeFontPanel() {
+  if (await w.evaluate(() => document.getElementById('fontPanel').classList.contains('open'))) {
+    await w.click('#fontBtn');
+    await w.waitForFunction(() => !document.getElementById('fontPanel').classList.contains('open'));
+  }
+}
+
+await setContentSize(1400, 900);
 await w.click('[data-tool="erase"]');
 const visible = await w.evaluate(() => [...document.querySelectorAll('.ctx .sec')].filter(s => s.classList.contains('show')).map(s => s.dataset.ctx));
 if (!visible.includes('erase rect')) throw new Error('Inspector không hiện nhóm tẩy xoá: ' + visible);
-const rect = await w.evaluate(() => { const s = document.querySelector('.ctx'); const r = s.getBoundingClientRect(); return { w: r.width, top: r.top }; });
-if (rect.w < 260) throw new Error('Inspector quá hẹp: ' + rect.w);
-console.log('inspector ok:', JSON.stringify({ visible, width: rect.w }));
+const geo1400 = await w.evaluate(() => {
+  const cards = [...document.querySelectorAll('#inspector .ctx .sec[data-ctx="erase rect"]')];
+  const r = document.getElementById('inspector').getBoundingClientRect();
+  return {
+    headings: document.querySelectorAll('#inspector .ctx .sec h4').length,
+    headingSize: getComputedStyle(document.querySelector('#inspector .ctx .sec h4')).fontSize,
+    cards: cards.length,
+    cardDisplay: cards.map(s => getComputedStyle(s).display),
+    inspector: { width: r.width, left: r.left, right: r.right, top: r.top, bottom: r.bottom },
+    vw: innerWidth, vh: innerHeight,
+  };
+});
+if (geo1400.headings !== 7) throw new Error('Số tiêu đề inspector khác 7: ' + geo1400.headings);
+if (geo1400.headingSize !== '12px') throw new Error('Tiêu đề inspector không phải 12px: ' + geo1400.headingSize);
+if (geo1400.cards !== 2 || geo1400.cardDisplay.some(d => d !== 'flex')) throw new Error('Hai card tẩy xoá không hiển thị flex: ' + JSON.stringify(geo1400));
+if (geo1400.inspector.width < 300 || geo1400.inspector.width > 340) throw new Error('Inspector sai bề rộng ở 1400: ' + geo1400.inspector.width);
+if (geo1400.inspector.left < 0 || geo1400.inspector.right > geo1400.vw + 1) throw new Error('Inspector lệch khỏi màn hình ở 1400: ' + JSON.stringify(geo1400.inspector));
+const seg1400 = await segWidths(); assertNoOverflow(seg1400, '1400×900');
+
+await w.click('[data-tool="text"]');
+await w.click('#fontBtn');
+await w.waitForFunction(() => document.getElementById('fontPanel').classList.contains('open'));
+const fp1400 = await w.evaluate(() => {
+  const p = document.getElementById('fontPanel').getBoundingClientRect();
+  const i = document.getElementById('inspector').getBoundingClientRect();
+  return { width: p.width, left: p.left, right: p.right, top: p.top, bottom: p.bottom, inspLeft: i.left, vw: innerWidth, vh: innerHeight };
+});
+if (Math.abs(fp1400.width - 380) > 2) throw new Error('Font flyout sai bề rộng ở 1400: ' + fp1400.width);
+if (Math.abs(fp1400.right - (fp1400.inspLeft - 16)) > 2) throw new Error('Font flyout cách inspector khác 16px: ' + JSON.stringify(fp1400));
+if (fp1400.left < 0 || fp1400.top < 0 || fp1400.right > fp1400.vw || fp1400.bottom > fp1400.vh) throw new Error('Font flyout tràn màn hình ở 1400: ' + JSON.stringify(fp1400));
+await closeFontPanel();
+
+await setContentSize(900, 600);
+await w.click('#inspectorToggle');
+await w.waitForFunction(() => document.body.classList.contains('inspector-open'));
+await w.click('[data-tool="erase"]');
+const seg900 = await segWidths(); assertNoOverflow(seg900, '900×600');
+await w.click('[data-tool="text"]');
+await w.click('#fontBtn');
+await w.waitForFunction(() => document.getElementById('fontPanel').classList.contains('open'));
+const fp900 = await w.evaluate(() => {
+  const p = document.getElementById('fontPanel').getBoundingClientRect();
+  return { width: p.width, left: p.left, right: p.right, top: p.top, bottom: p.bottom, cx: (p.left + p.right) / 2, cy: (p.top + p.bottom) / 2, vw: innerWidth, vh: innerHeight };
+});
+if (Math.abs(fp900.width - 520) > 2) throw new Error('Font modal sai bề rộng ở 900: ' + fp900.width);
+if (Math.abs(fp900.cx - fp900.vw / 2) > 2 || Math.abs(fp900.cy - fp900.vh / 2) > 2) throw new Error('Font modal không căn giữa ở 900: ' + JSON.stringify(fp900));
+if (fp900.left < 0 || fp900.top < 0 || fp900.right > fp900.vw || fp900.bottom > fp900.vh) throw new Error('Font modal tràn màn hình ở 900: ' + JSON.stringify(fp900));
+// Đóng drawer khi panel đang mở phải gỡ luôn .open; mở lại rồi vượt breakpoint 1200 cũng phải gỡ.
+await w.click('#inspectorToggle');
+await w.waitForFunction(() => !document.getElementById('fontPanel').classList.contains('open') && !document.body.classList.contains('inspector-open'));
+await w.click('#inspectorToggle');
+await w.click('#fontBtn');
+await w.waitForFunction(() => document.getElementById('fontPanel').classList.contains('open'));
+await setContentSize(1400, 900);
+await w.waitForFunction(() => !document.getElementById('fontPanel').classList.contains('open'));
+await setContentSize(1500, 940);
+await w.click('[data-tool="erase"]');
+console.log('inspector ok:', JSON.stringify({ visible, width1400: geo1400.inspector.width, seg1400, font1400: { width: fp1400.width, gap: +(fp1400.inspLeft - fp1400.right).toFixed(1) }, seg900, font900: { width: fp900.width, cx: fp900.cx, cy: fp900.cy, vw: fp900.vw, vh: fp900.vh } }));
 await dragRect(0, 140, 196, 330, 214);         // che dòng chấm "Họ và tên: ....."
 let o = await objs(); console.log('rect after draw:', JSON.stringify(o[0]));
 await w.keyboard.type('');

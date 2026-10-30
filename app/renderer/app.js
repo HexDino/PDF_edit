@@ -279,10 +279,15 @@ $('thumbsToggle').onclick = () => {
   const narrow = matchMedia('(max-width:1199px)').matches;
   document.body.classList.toggle(narrow ? 'thumbs-open' : 'thumbs-collapsed');
 };
-$('inspectorToggle').onclick = () => document.body.classList.toggle('inspector-open');
-$('inspectorClose').onclick = () => document.body.classList.remove('inspector-open');
+$('inspectorToggle').onclick = () => { closePicker(); document.body.classList.toggle('inspector-open'); };
+$('inspectorClose').onclick = () => { closePicker(); document.body.classList.remove('inspector-open'); };
 $('viewer').addEventListener('wheel', e => { if (e.ctrlKey && pages.length) { e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); } }, { passive: false });
-let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { pages.forEach(p => p.rendered = -1); renderAll(); }, 200); });
+let rT, narrowView = matchMedia('(max-width:1199px)').matches;
+window.addEventListener('resize', () => {
+  const narrow = matchMedia('(max-width:1199px)').matches;
+  if (narrow !== narrowView) { narrowView = narrow; closePicker(); }
+  clearTimeout(rT); rT = setTimeout(() => { pages.forEach(p => p.rendered = -1); renderAll(); }, 200);
+});
 
 function buildThumb(pg) {
   const th = document.createElement('div'); th.className = 'th';
