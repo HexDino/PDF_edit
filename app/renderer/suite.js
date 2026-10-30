@@ -15,9 +15,11 @@ const pendingJobEvents = [];
 
 const baseName = p => String(p).split(/[\\/]/).pop();
 const formatBytes = n => {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  const bytes = Number.isFinite(n) ? Math.max(0, n) : 0;
+  // Dưới 10 KiB hiện nguyên byte để file nhỏ không bị làm tròn thành cùng một số.
+  if (bytes < 10 * 1024) return `${Math.round(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 100 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 };
 const toast = (msg, ms = 3000) => {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');

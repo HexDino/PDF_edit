@@ -52,7 +52,7 @@ Yêu cầu: **Windows 10/11 x64**. File `.exe` **chưa ký số**, Windows Smart
 | Bảo mật | **Mở khoá PDF** | Gỡ mã hoá khi biết mật khẩu | `<tên>-mo-khoa.pdf` |
 | Bảo mật | **Xoá metadata** | Xoá Info, XMP (catalog + trang), tệp đính kèm | `<tên>-xoa-metadata.pdf` |
 
-**Nén PDF**: chế độ lossless (qpdf) chỉ nén lại cấu trúc/luồng dữ liệu nên **không hứa giảm nhiều** — có file còn tăng dung lượng; kết quả hiển thị đúng số đo trước/sau. Chế độ raster chỉ thay các trang đã chọn bằng ảnh và **làm mất lớp chữ trên các trang đó**; các trang không chọn được giữ nguyên.
+**Nén PDF**: chế độ lossless (qpdf) chỉ nén lại cấu trúc/luồng dữ liệu nên **không hứa giảm nhiều** — có file còn tăng dung lượng; kết quả hiển thị đúng số đo trước/sau. Chế độ raster chỉ thay các trang đã chọn bằng ảnh và **làm mất lớp chữ trên các trang đó**; các trang không chọn được giữ nguyên. Trang có góc xoay không phải bội số 90 bị từ chối ở chế độ raster.
 
 Điểm chung của bộ công cụ:
 

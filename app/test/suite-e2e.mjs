@@ -21,6 +21,16 @@ const PNG_60x90 = Buffer.from(
 );
 const nearPt = (actual, expected, label, tolerance = 0.01) =>
   assert.ok(Math.abs(actual - expected) < tolerance, `${label}: mong đợi ${expected}, nhận ${actual}`);
+// Khớp quy ước formatBytes của renderer: < 10 KiB hiện nguyên byte.
+const formatUiBytes = n => {
+  if (n < 10 * 1024) return `${Math.round(n)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 100 * 1024 ? 1 : 0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+};
+const sizeLine = (before, after) => {
+  const percent = Math.round((1 - after / before) * 100);
+  return `Dung lượng: ${formatUiBytes(before)} → ${formatUiBytes(after)} · ${percent < 0 ? 'Tăng' : 'Giảm'} ${Math.abs(percent)}%`;
+};
 const pageImageSize = (doc, page) => {
   const resources = page.node.Resources();
   const xobjects = resources && resources.lookup(PDFName.of('XObject'));
@@ -1342,7 +1352,8 @@ try {
   assert.equal(path.dirname(path.resolve(losslessFile)), path.resolve(compressOut));
   assert.equal(losslessRes.stats.mode, 'lossless');
   assert.equal(losslessRes.stats.beforeBytes, compressBytes);
-  assert.equal(losslessRes.stats.afterBytes, fs.statSync(losslessFile).size);
+  const losslessAfterBytes = fs.statSync(losslessFile).size;
+  assert.equal(losslessRes.stats.afterBytes, losslessAfterBytes);
   assert.equal(Number.isInteger(losslessRes.stats.savedPercent), true);
   assert.equal(losslessRes.stats.rasterPages, 0);
   assert.deepEqual(losslessRes.errors, []);
@@ -1350,7 +1361,10 @@ try {
   const losslessDoc = await PDFDocument.load(fs.readFileSync(losslessFile));
   assert.equal(losslessDoc.getPageCount(), 3);
   const losslessPanel = await w.evaluate(() => document.querySelector('#result')?.textContent || '');
-  assert.match(losslessPanel, /Dung lượng: .+ → .+ · (Giảm|Tăng) \d+%/, 'panel phải hiện dung lượng: ' + losslessPanel);
+  assert.ok(
+    losslessPanel.includes(sizeLine(compressBytes, losslessAfterBytes)),
+    `panel phải hiện đúng byte trước/sau: ${losslessPanel}`,
+  );
   assert.equal(losslessPanel.includes(compressSrc), false, 'panel không được lộ đường dẫn');
   assert.equal(await w.locator('#result .warn').isVisible(), false);
   console.log('compress lossless ok:', path.basename(losslessFile), '· 3 trang · qpdf --check · stats · dòng dung lượng');
@@ -1385,7 +1399,8 @@ try {
   assert.equal(rasterRes.stats.mode, 'raster');
   assert.equal(rasterRes.stats.rasterPages, 1);
   assert.equal(rasterRes.stats.beforeBytes, compressBytes);
-  assert.equal(rasterRes.stats.afterBytes, fs.statSync(rasterFile).size);
+  const rasterAfterBytes = fs.statSync(rasterFile).size;
+  assert.equal(rasterRes.stats.afterBytes, rasterAfterBytes);
   assert.equal(Number.isInteger(rasterRes.stats.savedPercent), true);
   assert.equal(rasterRes.errors.length, 1);
   assert.equal(rasterRes.errors[0].code, 'TEXT_LAYER_REMOVED');
@@ -1397,7 +1412,10 @@ try {
   const rasterPanel = await w.evaluate(() => document.querySelector('#result')?.textContent || '');
   assert.equal(await w.locator('#result .warn').isVisible(), true, 'phải hiện cảnh báo mất lớp chữ');
   assert.equal(await w.locator('#result .warn').textContent(), 'Các trang đã raster hoá không còn lớp chữ.');
-  assert.match(rasterPanel, /Dung lượng: .+ → .+ · (Giảm|Tăng) \d+%/, 'panel phải hiện dung lượng: ' + rasterPanel);
+  assert.ok(
+    rasterPanel.includes(sizeLine(compressBytes, rasterAfterBytes)),
+    `panel phải hiện đúng byte trước/sau: ${rasterPanel}`,
+  );
   assert.equal(rasterPanel.includes(compressSrc), false, 'panel không được lộ đường dẫn');
   const rasterText = await w.evaluate(async bytes => {
     const pdfjs = await import('./vendor/pdf.min.mjs');

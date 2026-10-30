@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, PDFName } = require('pdf-lib');
 const { ToolError } = require('../errors');
 const { validateOptions } = require('../schema');
 const { parsePageRange } = require('../pages');
@@ -21,7 +21,8 @@ const ROTATIONS = new Set([0, 90, 180, 270]);
 
 function optionsFor(input) {
   try {
-    return validateOptions({ options: compressOptions }, input ?? {});
+    // Chỉ undefined được thay bằng {}; null/array/kiểu khác vẫn phải bị schema từ chối.
+    return validateOptions({ options: compressOptions }, input === undefined ? {} : input);
   } catch {
     throw new ToolError('INVALID_OPTIONS', 'Tuỳ chọn nén không hợp lệ.');
   }
@@ -56,8 +57,19 @@ async function loadPdf(file) {
   }
 }
 
-// Kích thước khung nhìn của trang: CropBox ∩ MediaBox, đổi chỗ rộng/cao khi
-// trang xoay 90/270 — khớp với viewport mà render worker dùng để xuất ảnh.
+// PDF.js nhân kích thước viewport với /UserUnit; giá trị thiếu = 1, <= 0 là file hỏng.
+function userUnit(page) {
+  const value = page.node.get(PDFName.of('UserUnit'));
+  if (value === undefined) return 1;
+  const unit = value && typeof value.asNumber === 'function' ? value.asNumber() : NaN;
+  if (!Number.isFinite(unit) || unit <= 0) {
+    throw new ToolError('INVALID_FILE', 'Trang có đơn vị kích thước không hợp lệ.');
+  }
+  return unit;
+}
+
+// Kích thước khung nhìn của trang: CropBox ∩ MediaBox, nhân /UserUnit, đổi chỗ
+// rộng/cao khi trang xoay 90/270 — khớp với viewport mà render worker dùng để xuất ảnh.
 function visibleSize(page) {
   const media = page.getMediaBox();
   const crop = page.getCropBox();
@@ -65,8 +77,9 @@ function visibleSize(page) {
   const y = Math.max(media.y, crop.y);
   const right = Math.min(media.x + media.width, crop.x + crop.width);
   const bottom = Math.min(media.y + media.height, crop.y + crop.height);
-  let width = right - x;
-  let height = bottom - y;
+  const unit = userUnit(page);
+  let width = (right - x) * unit;
+  let height = (bottom - y) * unit;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     throw new ToolError('INVALID_FILE', 'Trang có vùng hiển thị không hợp lệ.');
   }
@@ -123,7 +136,13 @@ async function compressLossless(ctx, file) {
       throw new ToolError('INVALID_FILE', 'Không đọc được PDF.');
     }
   }
-  ctx.signal?.throwIfAborted?.();
+  try {
+    ctx.signal?.throwIfAborted?.();
+  } catch (e) {
+    // qpdf đã tạo file tạm trước khi job bị huỷ: không để nó nằm lại.
+    discard(tmp);
+    throw e;
+  }
   if (!hasUsableOutput(tmp)) {
     discard(tmp);
     throw new ToolError('INTERNAL', 'qpdf không tạo được file.');
@@ -157,9 +176,15 @@ async function compressRaster(ctx, file, options) {
       signal: ctx.signal,
       progress: (done, total) => ctx.progress('processing', done, total, `Đang raster hoá trang ${done}/${total}…`),
     });
+    // Ghi lại đường dẫn ngay khi worker trả về: nếu assert/abort dưới đây thất bại
+    // thì catch vẫn biết ảnh nào cần xoá.
+    renderedFiles = Array.isArray(rendered)
+      ? rendered
+        .map(item => (item && typeof item.path === 'string' && item.path ? item.path : null))
+        .filter(Boolean)
+      : [];
     ctx.signal?.throwIfAborted?.();
     assertRendered(rendered, pages);
-    renderedFiles = rendered.map(item => item.path);
     const imageFor = new Map(rendered.map(item => [item.page, item.path]));
 
     const out = await PDFDocument.create();
@@ -186,6 +211,9 @@ async function compressRaster(ctx, file, options) {
     fs.writeFileSync(tmp, await out.save());
     ctx.signal?.throwIfAborted?.();
     const outPath = publishUnique(tmp, ctx.outputDir || path.dirname(file), outputName(file, 'nen'));
+    // Ảnh đã nhúng xong; dọn ngay để tempDir sạch sau khi xuất bản.
+    for (const item of renderedFiles) discard(item);
+    renderedFiles = [];
     ctx.progress('done', 1, 1, 'Đã nén xong');
     return {
       output: outPath,

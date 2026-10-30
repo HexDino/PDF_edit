@@ -8,13 +8,14 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const {
-  PDFDocument, PDFName, PDFRawStream, degrees, decodePDFRawStream,
+  PDFDocument, PDFName, PDFNumber, PDFRawStream, degrees, decodePDFRawStream,
 } = require('pdf-lib');
 const { compressTool } = require('../../suite/pdfops/compress.js');
 const { runProcess } = require('../../suite/util/spawn.js');
 const { binaryPath } = require('../../suite/util/paths.js');
 
 const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SIG_PHOTO = fs.readFileSync(path.join(APP_ROOT, 'test', 'sig-photo.jpg'));
 const qpdf = (args, opts = {}) => runProcess(
   binaryPath('qpdf.exe', { appRoot: APP_ROOT, isPackaged: false }),
   args, opts,
@@ -114,6 +115,11 @@ test('lossless tạo <base>-nen.pdf, giữ số trang, báo before/after', async
   assert.equal(r.stats.afterBytes, fs.statSync(out).size);
   assert.ok(r.stats.beforeBytes > 0 && r.stats.afterBytes > 0);
   assert.equal(Number.isInteger(r.stats.savedPercent), true);
+  assert.equal(
+    r.stats.savedPercent,
+    Math.round((1 - r.stats.afterBytes / r.stats.beforeBytes) * 100),
+    'savedPercent phải đúng công thức từ số byte thực tế',
+  );
   assert.equal(r.stats.rasterPages, 0);
   assert.deepEqual(r.errors, []);
   assert.equal(fs.existsSync(path.join(ctx.tempDir, 'compressed.pdf')), false, 'temp phải được dọn sau khi xuất bản');
@@ -172,6 +178,7 @@ test('raster chỉ thay trang chọn, trang khác giữ nguyên, cảnh báo TEX
   assert.equal(seen.outDir, ctx.tempDir);
   assert.equal(seen.signal, ctx.signal);
   assert.equal(typeof seen.progress, 'function');
+  assert.deepEqual(fs.readdirSync(ctx.tempDir), [], 'tempDir phải sạch sau khi xuất bản');
 });
 
 test('raster dùng vùng hiển thị CropBox và góc xoay', async t => {
@@ -196,6 +203,55 @@ test('raster dùng vùng hiển thị CropBox và góc xoay', async t => {
   assert.equal(((page2.getRotation().angle % 360) + 360) % 360, 0);
 });
 
+test('raster giữ nguyên CropBox và góc xoay của trang không chọn', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'keep.pdf');
+  const src = await PDFDocument.create();
+  const kept = src.addPage([200, 300]);
+  kept.setCropBox(10, 20, 140, 240);
+  kept.setRotation(degrees(90));
+  kept.drawText('Kept page', { x: 20, y: 250, size: 14 });
+  src.addPage([220, 320]).drawText('Raster', { x: 20, y: 270, size: 14 });
+  fs.writeFileSync(file, await src.save());
+
+  const r = await compressTool(ctxFor(file, dir, { mode: 'raster', pages: '2' }));
+  const outDoc = await PDFDocument.load(fs.readFileSync(r.outputs[0].path));
+  const outKept = outDoc.getPage(0);
+  assert.deepEqual(outKept.getCropBox(), { x: 10, y: 20, width: 140, height: 240 });
+  assert.equal(((outKept.getRotation().angle % 360) + 360) % 360, 90);
+  assert.deepEqual([outKept.getWidth(), outKept.getHeight()], [200, 300]);
+});
+
+test('raster nhân kích thước trang theo /UserUnit', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'unit.pdf');
+  const src = await PDFDocument.create();
+  const page = src.addPage([200, 300]);
+  page.node.set(PDFName.of('UserUnit'), PDFNumber.of(2));
+  page.drawText('Trang 1', { x: 20, y: 250, size: 14 });
+  fs.writeFileSync(file, await src.save());
+
+  const r = await compressTool(ctxFor(file, dir, { mode: 'raster', pages: '1' }));
+  const outDoc = await PDFDocument.load(fs.readFileSync(r.outputs[0].path));
+  assert.deepEqual([outDoc.getPage(0).getWidth(), outDoc.getPage(0).getHeight()], [400, 600]);
+});
+
+test('raster từ chối /UserUnit <= 0 bằng INVALID_FILE', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'unit-bad.pdf');
+  const src = await PDFDocument.create();
+  const page = src.addPage([200, 300]);
+  page.node.set(PDFName.of('UserUnit'), PDFNumber.of(0));
+  page.drawText('Trang 1', { x: 20, y: 250, size: 14 });
+  fs.writeFileSync(file, await src.save());
+
+  await assert.rejects(
+    compressTool(ctxFor(file, dir, { mode: 'raster', pages: '1' })),
+    e => e.code === 'INVALID_FILE' && !e.message.includes(dir),
+  );
+  assert.equal(fs.existsSync(path.join(dir, 'unit-bad-nen.pdf')), false);
+});
+
 test('raster không ghi đè: lần hai nhận (2)', async t => {
   const dir = tempDir(t);
   const file = path.join(dir, 'a.pdf');
@@ -208,6 +264,47 @@ test('raster không ghi đè: lần hai nhận (2)', async t => {
 
   assert.equal(path.basename(second.outputs[0].path), 'a-nen (2).pdf');
   assert.deepEqual(fs.readFileSync(first.outputs[0].path), firstBytes, 'file đầu phải giữ nguyên');
+});
+
+test('raster JPEG nhúng ảnh thật và dọn tempDir sau xuất bản', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'photo.pdf');
+  await makePdf(file, 2);
+  const ctx = ctxFor(file, dir, { mode: 'raster', pages: '1', format: 'jpg' });
+  ctx.render.pdfToImages = async ({ pages, outDir, signal }) => pages.map(n => {
+    signal?.throwIfAborted?.();
+    const p = path.join(outDir, `render-${n}.jpg`);
+    fs.writeFileSync(p, SIG_PHOTO);
+    return { page: n, path: p };
+  });
+
+  const r = await compressTool(ctx);
+
+  const outDoc = await PDFDocument.load(fs.readFileSync(r.outputs[0].path));
+  assert.deepEqual(pageImageSize(outDoc, outDoc.getPage(0)), { width: 1200, height: 600 });
+  assert.equal(pageShows(outDoc, outDoc.getPage(1), 'Trang 2'), true);
+  assert.equal(r.stats.rasterPages, 1);
+  assert.deepEqual(fs.readdirSync(ctx.tempDir), [], 'tempDir phải sạch sau khi xuất bản');
+});
+
+test('raster dọn ảnh tạm khi kiểm tra render thất bại', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'a.pdf');
+  await makePdf(file, 2);
+  const ctx = ctxFor(file, dir, { mode: 'raster', pages: '1' });
+  // Trả sai trang kèm file thật: assertRendered phải ném lỗi và catch phải xoá file.
+  ctx.render.pdfToImages = async ({ outDir }) => {
+    const p = path.join(outDir, 'orphan.png');
+    fs.writeFileSync(p, PNG_1x1);
+    return [{ page: 2, path: p }];
+  };
+
+  await assert.rejects(
+    compressTool(ctx),
+    e => e.code === 'RENDER_FAILED' && !e.message.includes(dir),
+  );
+  assert.equal(fs.existsSync(path.join(ctx.tempDir, 'orphan.png')), false);
+  assert.deepEqual(fs.readdirSync(ctx.tempDir), [], 'tempDir phải sạch sau lỗi render');
 });
 
 test('PDF mã hoá báo PASSWORD_REQUIRED, PDF hỏng báo INVALID_FILE', async t => {
@@ -274,6 +371,47 @@ test('options sai bị từ chối khi gọi trực tiếp, không tạo output'
     );
     assert.equal(fs.existsSync(path.join(dir, 'a-nen.pdf')), false);
   }
+});
+
+test('options null/array/không phải object bị từ chối, undefined dùng mặc định', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'a.pdf');
+  await makePdf(file, 2);
+
+  for (const options of [null, [], 'lossless', 42, true]) {
+    const ctx = ctxFor(file, dir);
+    ctx.options = options;
+    await assert.rejects(
+      compressTool(ctx),
+      e => e.code === 'INVALID_OPTIONS' && !e.message.includes(dir),
+    );
+    assert.equal(fs.existsSync(path.join(dir, 'a-nen.pdf')), false);
+  }
+
+  const ctx = ctxFor(file, dir);
+  ctx.options = undefined;
+  const r = await compressTool(ctx);
+  assert.equal(path.basename(r.outputs[0].path), 'a-nen.pdf');
+});
+
+test('abort sau qpdf dọn file tạm lossless', async t => {
+  const dir = tempDir(t);
+  const file = path.join(dir, 'a.pdf');
+  await makePdf(file, 2);
+  const controller = new AbortController();
+  const ctx = ctxFor(file, dir);
+  ctx.signal = controller.signal;
+  ctx.qpdf = async args => {
+    fs.copyFileSync(file, args[args.length - 1]);
+    controller.abort();
+  };
+
+  await assert.rejects(
+    compressTool(ctx),
+    e => e.name === 'AbortError' || e.code === 'CANCELLED',
+  );
+  assert.equal(fs.existsSync(path.join(ctx.tempDir, 'compressed.pdf')), false, 'file tạm phải được xoá');
+  assert.equal(fs.existsSync(path.join(dir, 'a-nen.pdf')), false);
 });
 
 test('qpdf exit 3 với file dùng được vẫn xuất bản', async t => {
