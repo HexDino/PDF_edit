@@ -295,7 +295,38 @@ await w.click('#thumbsToggle');
 await w.waitForTimeout(250);
 const wideReopened = await measure();
 if (!wideReopened.side.visible || Math.abs(wideReopened.side.width - 168) > 2 || wideReopened.thumbsAria !== 'true') throw new Error('Mở lại thumbnails ở 1400 sai');
+// Desktop: thu gọn phải xoá cờ thumbs-open cũ, ẩn hẳn và chặn tab vào sidebar.
+await A(() => document.body.classList.add('thumbs-open'));
+await w.click('#thumbsCollapse');
+await w.waitForTimeout(250);
+const desktopCollapsed = await A(() => {
+  const side = document.getElementById('side'), s = getComputedStyle(side);
+  return {
+    collapsed: document.body.classList.contains('thumbs-collapsed'),
+    staleOpen: document.body.classList.contains('thumbs-open'),
+    visibility: s.visibility, pointerEvents: s.pointerEvents, inert: side.inert === true,
+    aria: document.getElementById('thumbsToggle').getAttribute('aria-expanded'),
+    width: side.getBoundingClientRect().width,
+  };
+});
+if (!desktopCollapsed.collapsed || desktopCollapsed.staleOpen) throw new Error('Thu gọn desktop còn cờ thumbs-open: ' + JSON.stringify(desktopCollapsed));
+if (desktopCollapsed.width > 1 || desktopCollapsed.visibility !== 'hidden' || desktopCollapsed.pointerEvents !== 'none' || !desktopCollapsed.inert)
+  throw new Error('Sidebar thu gọn vẫn còn control focusable: ' + JSON.stringify(desktopCollapsed));
+if (desktopCollapsed.aria !== 'false') throw new Error('aria-expanded thumbnails sai khi thu gọn desktop');
+await w.click('#thumbsToggle');
+await w.waitForTimeout(250);
+const desktopReopened = await A(() => {
+  const side = document.getElementById('side'), s = getComputedStyle(side);
+  return { collapsed: document.body.classList.contains('thumbs-collapsed'), staleOpen: document.body.classList.contains('thumbs-open'),
+    visibility: s.visibility, pointerEvents: s.pointerEvents, inert: side.inert === true, width: side.getBoundingClientRect().width,
+    aria: document.getElementById('thumbsToggle').getAttribute('aria-expanded') };
+});
+if (desktopReopened.collapsed || desktopReopened.staleOpen) throw new Error('Mở lại desktop còn class cũ: ' + JSON.stringify(desktopReopened));
+if (Math.abs(desktopReopened.width - 168) > 2 || desktopReopened.visibility !== 'visible' || desktopReopened.pointerEvents === 'none' || desktopReopened.inert)
+  throw new Error('Mở lại desktop không khôi phục sidebar: ' + JSON.stringify(desktopReopened));
+if (desktopReopened.aria !== 'true') throw new Error('aria-expanded thumbnails sai khi mở lại desktop');
 console.log('1400 thumbnails/canvas ok:', JSON.stringify({ side: wideReopened.side.width, viewer: Math.round(wideReopened.viewer.width), pill: pagePill }));
+console.log('desktop collapse ok:', JSON.stringify({ hidden: desktopCollapsed, reopened: desktopReopened }));
 
 check('Không có lỗi JS trong suốt quá trình', errors.length === 0, errors.slice(0, 2).join(' | '));
 

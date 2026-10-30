@@ -225,6 +225,7 @@ async function openBytes(bytes, name, path) {
     fitWidth(true); updateButtons(); setDirty(false);
     status(`${origName} · ${doc.numPages} trang`);
     renderThumbs();
+    updateCurrentThumb();
     // Khôi phục phiên chỉnh sửa đã lưu cạnh file gốc (nếu có)
     const restored = await loadSession();
     if (restored > 0) {
@@ -282,15 +283,23 @@ function syncPanelAria() {
   const thumbsOpen = narrow ? document.body.classList.contains('thumbs-open') : !document.body.classList.contains('thumbs-collapsed');
   $('thumbsToggle').setAttribute('aria-expanded', String(thumbsOpen));
   $('inspectorToggle').setAttribute('aria-expanded', String(document.body.classList.contains('inspector-open')));
+  // Sidebar thu gọn không còn tab được vào các control vô hình.
+  $('side').inert = !thumbsOpen;
 }
 $('thumbsToggle').onclick = () => {
   const narrow = matchMedia('(max-width:1199px)').matches;
-  document.body.classList.toggle(narrow ? 'thumbs-open' : 'thumbs-collapsed');
+  if (narrow) {
+    document.body.classList.toggle('thumbs-open');
+    document.body.classList.remove('thumbs-collapsed');
+  } else {
+    document.body.classList.toggle('thumbs-collapsed');
+    document.body.classList.remove('thumbs-open');
+  }
   syncPanelAria();
 };
 $('thumbsCollapse').onclick = () => {
-  if (matchMedia('(max-width:1199px)').matches) document.body.classList.remove('thumbs-open');
-  else document.body.classList.add('thumbs-collapsed');
+  if (matchMedia('(max-width:1199px)').matches) document.body.classList.remove('thumbs-open', 'thumbs-collapsed');
+  else { document.body.classList.add('thumbs-collapsed'); document.body.classList.remove('thumbs-open'); }
   syncPanelAria();
 };
 $('inspectorToggle').onclick = () => { closePicker(); document.body.classList.toggle('inspector-open'); syncPanelAria(); };
@@ -324,11 +333,13 @@ function togglePageDeleted(pg) {
   if (pg.deleted && pages.every(p => p.deleted)) toast('Lưu ý: không thể lưu khi xóa hết các trang');
 }
 function refreshDeleted() { pages.forEach(p => { p.el.classList.toggle('deleted', p.deleted); p.thumb.classList.toggle('deleted', p.deleted); p.thumb.querySelector('.tdel').textContent = p.deleted ? '↺' : '🗑'; }); }
-$('viewer').addEventListener('scroll', () => {
+function updateCurrentThumb() {
+  if (!pages.length) return;
   const vt = $('viewer').getBoundingClientRect().top + 80; let best = pages[0];
   for (const p of pages) if (p.el.getBoundingClientRect().top <= vt) best = p;
   pages.forEach(p => p.thumb.classList.toggle('cur', p === best));
-});
+}
+$('viewer').addEventListener('scroll', updateCurrentThumb);
 
 /* ======================= Công cụ ======================= */
 const CTX_OF = { text: 'text', rect: 'rect', brush: 'rect', lasso: 'rect', img: 'img', ink: null };

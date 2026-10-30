@@ -38,7 +38,7 @@
     <button id="homeBtn" class="iconBtn" title="Về trang chủ" aria-label="Về trang chủ"><svg class="i"><use href="#i-back"/></svg></button>
     <div class="fileMeta">
       <span id="fileTitle" class="fileName">Chưa mở file</span>
-      <span class="fileSub"><span class="dot ok" id="dot"></span><span id="status">Sẵn sàng</span><span id="sessionTag" hidden></span></span>
+      <span class="fileSub"><span class="dot ok" id="dot"></span><span id="status" role="status" aria-live="polite">Sẵn sàng</span><span id="sessionTag" hidden></span></span>
     </div>
     <div class="grow"></div>
     <div class="grp">
@@ -124,11 +124,11 @@
           <div class="row">
             <span class="lbl">Màu</span>
             <input type="color" id="colorIn" value="#1a2a7a">
-            <button class="sw" data-c="#1a2a7a" style="background:#1a2a7a" title="Xanh mực"></button>
-            <button class="sw" data-c="#111111" style="background:#111111" title="Đen"></button>
-            <button class="sw" data-c="#c81e1e" style="background:#c81e1e" title="Đỏ"></button>
-            <button class="sw hlsw" data-c="#ffe14d" style="background:#ffe14d" title="Vàng"></button>
-            <button class="sw hlsw" data-c="#7ee081" style="background:#7ee081" title="Xanh lá"></button>
+            <button class="sw" data-c="#1a2a7a" style="background:#1a2a7a" title="Xanh mực" aria-label="Màu xanh mực"></button>
+            <button class="sw" data-c="#111111" style="background:#111111" title="Đen" aria-label="Màu đen"></button>
+            <button class="sw" data-c="#c81e1e" style="background:#c81e1e" title="Đỏ" aria-label="Màu đỏ"></button>
+            <button class="sw hlsw" data-c="#ffe14d" style="background:#ffe14d" title="Vàng" aria-label="Màu vàng"></button>
+            <button class="sw hlsw" data-c="#7ee081" style="background:#7ee081" title="Xanh lá" aria-label="Màu xanh lá"></button>
           </div>
         </div>
         <div class="sec" data-ctx="pen hl">
@@ -187,25 +187,25 @@
 </div>
 
 <!-- Hộp thoại chữ ký -->
-<div class="modal" id="sigModal" hidden>
+<div class="modal" id="sigModal" role="dialog" aria-modal="true" aria-labelledby="sigModalTitle" hidden>
   <div class="dlg">
-    <div class="dlgHead"><b>Chữ ký</b>
-      <div class="tabs"><button data-tab="draw" class="on">✍ Vẽ chữ ký</button><button data-tab="image">🖼 Từ ảnh</button><button data-tab="lib">📚 Thư viện</button></div>
-      <button class="icon x" data-close>✕</button></div>
+    <div class="dlgHead"><b id="sigModalTitle">Chữ ký</b>
+      <div class="tabs" role="group" aria-label="Nguồn chữ ký"><button data-tab="draw" class="on">Vẽ chữ ký</button><button data-tab="image">Từ ảnh</button><button data-tab="lib">Thư viện</button></div>
+      <button class="icon x" data-close title="Đóng" aria-label="Đóng hộp thoại chữ ký">✕</button></div>
     <div class="tab" data-tab="draw">
-      <div class="padWrap"><canvas id="pad"></canvas><div class="padLine">Ký vào đây</div></div>
+      <div class="padWrap"><canvas id="pad" role="img" aria-label="Ô vẽ chữ ký"></canvas><div class="padLine">Ký vào đây</div></div>
       <div class="row">
         <span class="lbl">Màu mực</span>
-        <button class="sw ps sel" data-c="#1a2a7a" style="background:#1a2a7a"></button>
-        <button class="sw ps" data-c="#111111" style="background:#111111"></button>
-        <button class="sw ps" data-c="#c81e1e" style="background:#c81e1e"></button>
+        <button class="sw ps sel" data-c="#1a2a7a" style="background:#1a2a7a" title="Xanh mực" aria-label="Màu xanh mực"></button>
+        <button class="sw ps" data-c="#111111" style="background:#111111" title="Đen" aria-label="Màu đen"></button>
+        <button class="sw ps" data-c="#c81e1e" style="background:#c81e1e" title="Đỏ" aria-label="Màu đỏ"></button>
         <span class="lbl">Độ đậm</span><input type="range" id="padW" min="1" max="8" step="0.5" value="3.2">
         <button id="padUndo">↶ Nét trước</button><button id="padClear">Xóa hết</button>
       </div>
     </div>
     <div class="tab" data-tab="image" hidden>
       <div class="row"><button id="sigImgBtn" class="primary">Chọn ảnh chữ ký (PNG/JPG)…</button><span class="lbl">Chụp chữ ký trên giấy trắng, đủ sáng.</span></div>
-      <div class="imgPrev"><canvas id="sigImgCanvas"></canvas><div id="sigImgEmpty">Chưa chọn ảnh</div></div>
+      <div class="imgPrev"><canvas id="sigImgCanvas" role="img" aria-label="Ảnh chữ ký xem trước"></canvas><div id="sigImgEmpty">Chưa chọn ảnh</div></div>
       <div class="row">
         <label class="chk"><input type="checkbox" id="bgRemove" checked> Tách nền (nền giấy → trong suốt)</label>
         <span class="lbl">Độ nhạy</span><input type="range" id="bgTol" min="5" max="120" value="45">
@@ -237,12 +237,16 @@
 </div>
 
 <!-- Hộp thoại lưu -->
-<div class="modal" id="saveModal" hidden>
+<div class="modal" id="saveModal" role="dialog" aria-modal="true" aria-labelledby="saveModalTitle" hidden>
   <div class="dlg small">
-    <div class="dlgHead"><b>Lưu PDF</b><span style="flex:1"></span><button class="icon x" data-close>✕</button></div>
+    <div class="dlgHead"><b id="saveModalTitle">Lưu PDF</b><span class="grow"></span><button class="icon x" data-close title="Đóng" aria-label="Đóng hộp thoại lưu">✕</button></div>
     <div class="pad16">
       <p id="saveInfo"></p>
-      <label class="chk big"><input type="checkbox" id="trueRemove" checked> <b>Xóa hẳn nội dung bị che</b> (khuyên dùng)</label>
+      <div class="trueCard">
+        <label class="chk big"><input type="checkbox" id="trueRemove" checked>
+          <span class="trueCardTxt"><b>Xóa hẳn nội dung bị che</b><span>Khuyên dùng · chữ và ảnh cũ dưới vùng che bị xóa thật khi lưu.</span></span>
+        </label>
+      </div>
       <div class="qOpts" id="flatOpts">
         <div class="row">
           <span class="lbl">Định dạng ảnh</span>
@@ -271,7 +275,7 @@
       <p class="note">Chế độ <b>Tự động</b> chọn PNG cho trang chữ (nét sắc, không mất dữ liệu) và JPEG cho trang scan/ảnh. Độ phân giải cao hơn thì file nặng hơn.</p>
       <p class="note warnTxt">Nếu bỏ chọn: vùng che chỉ phủ lên trên — người khác vẫn có thể sao chép hoặc gỡ lớp che để xem nội dung cũ.</p>
     </div>
-    <div class="dlgFoot"><span style="flex:1"></span><button data-close>Hủy</button><button class="primary" id="saveGo">Lưu</button></div>
+    <div class="dlgFoot"><span class="grow"></span><button data-close>Hủy</button><button class="primary" id="saveGo">Lưu</button></div>
   </div>
 </div>
 
@@ -279,7 +283,7 @@
 <input type="file" id="imgInput" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="sigImgInput" accept="image/png,image/jpeg,image/webp" hidden>
 <div id="measure"></div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="busy"><div id="busyTxt">Đang xử lý…</div></div>
 <script type="module" src="app.js"></script>
 </body>
