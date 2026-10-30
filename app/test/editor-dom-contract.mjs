@@ -37,8 +37,15 @@ try {
   if (missingSelectors.length) throw new Error('Missing selectors: ' + missingSelectors.join(', '));
   if (toolCount !== 5) throw new Error('Expected 5 [data-tool], got ' + toolCount);
   if (secCount !== 7) throw new Error('Expected 7 #inspector .ctx .sec, got ' + secCount);
+  await w.evaluate(() => document.body.classList.add('dirty', 'inspector-open'));
   await w.click('[data-tool="erase"]');
-  if (await w.evaluate(() => document.body.className) !== 'tool-erase') throw new Error('tool class not switched');
+  const switched = await w.evaluate(() => ({
+    tool: document.body.classList.contains('tool-erase'),
+    dirty: document.body.classList.contains('dirty'),
+    drawer: document.body.classList.contains('inspector-open'),
+  }));
+  if (!switched.tool) throw new Error('tool class not switched');
+  if (!switched.dirty || !switched.drawer) throw new Error('setTool cleared state classes: ' + JSON.stringify(switched));
   console.log('editor DOM contract ok · 5 tools · 7 property sections');
 } finally {
   await closeApp(app);
